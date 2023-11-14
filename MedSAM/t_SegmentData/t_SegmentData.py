@@ -175,7 +175,7 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Buttons
         self.ui.pbSendImage.connect('clicked(bool)', lambda: self.logic.sendImage())
-        self.ui.pbSegment.connect('clicked(bool)', lambda: self.logic.inferSegmentation())
+        self.ui.pbSegment.connect('clicked(bool)', lambda: self.logic.applySegmentation())
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
@@ -313,8 +313,9 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
         print('Response from setImage:', response.text)
 
         ######## Set your image path here
-        self.img_sitk = sitk.ReadImage('/home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer/HCC_004_0000.nii.gz')
         self.volume_node = slicer.util.getNodesByClass('vtkMRMLScalarVolumeNode')[0]
+        self.img_path = self.volume_node.GetStorageNode().GetFullNameFromFileName()
+        self.img_sitk = sitk.ReadImage(self.img_path)
         self.image_data = slicer.util.arrayFromVolume(self.volume_node)  ################ Only one node?
         with NumpySocket() as s:
             s.connect(numpyServerAddress)
@@ -333,10 +334,22 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
         for frame in frames:
             seg_result[frame, :, :] = seg_data[str(frame)]
 
-        seg_sitk = sitk.GetImageFromArray(seg_result)
+        return seg_result
+    
+    def showSegmentation(self, segmentation_mask):
+        segmentation_res_file = os.path.dirname(self.img_path) + '/lite_seg_' + os.path.basename(self.img_path)
+        seg_sitk = sitk.GetImageFromArray(segmentation_mask)
         seg_sitk.CopyInformation(self.img_sitk)
-        sitk.WriteImage(seg_sitk, '/home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer/lite_seg_HCC_004_0000.nii.gz') ########## Set your segmentation output here
-        slicer.util.loadSegmentation('/home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer/lite_seg_HCC_004_0000.nii.gz') 
+        sitk.WriteImage(seg_sitk, segmentation_res_file) ########## Set your segmentation output here
+        slicer.util.loadSegmentation(segmentation_res_file)
+        # segment_volume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode")
+        # segment_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode")
+        # slicer.util.updateVolumeFromArray(segment_volume, segmentation_mask)
+        # slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(segment_volume, segment_node)
+    
+    def applySegmentation(self, serverUrl='http://127.0.0.1:5555'):
+        segmentation_mask = self.inferSegmentation(serverUrl)
+        self.showSegmentation(segmentation_mask)
     
     def get_bounding_box(self):
         roiNode = slicer.util.getNode("R") # multiple bounding box?
