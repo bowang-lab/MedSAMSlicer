@@ -6,11 +6,55 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>361</width>
-    <height>342</height>
+    <width>373</width>
+    <height>358</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <property name="bottomMargin">
+      <number>15</number>
+     </property>
+     <item>
+      <widget class="QPushButton" name="pbCTprep">
+       <property name="text">
+        <string>CT preprocess</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pbMRprep">
+       <property name="text">
+        <string>MR preprocess</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pbAttach">
+       <property name="text">
+        <string>Attach ROI</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="qMRMLMarkupsROIWidget" name="widgetROI"/>
+   </item>
+   <item>
+    <spacer name="verticalSpacer_2">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
    <item>
     <widget class="QPushButton" name="pbSendImage">
      <property name="text">
@@ -46,6 +90,11 @@
    <extends>QWidget</extends>
    <header>qMRMLWidget.h</header>
    <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>qMRMLMarkupsROIWidget</class>
+   <extends>QWidget</extends>
+   <header>qMRMLMarkupsROIWidget.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

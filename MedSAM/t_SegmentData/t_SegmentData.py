@@ -145,6 +145,7 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.logic = None
         self._parameterNode = None
         self._parameterNodeGuiTag = None
+        self.parameterSetNode = None
 
     def setup(self) -> None:
         """
@@ -157,6 +158,19 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         uiWidget = slicer.util.loadUI(self.resourcePath('UI/t_SegmentData.ui'))
         self.layout.addWidget(uiWidget)
         self.ui = slicer.util.childWidgetVariables(uiWidget)
+
+
+        ############################################################################
+        import qSlicerSegmentationsModuleWidgetsPythonQt
+        self.editor = qSlicerSegmentationsModuleWidgetsPythonQt.qMRMLSegmentEditorWidget()
+        self.editor.setMaximumNumberOfUndoStates(10)
+        self.selectParameterNode()
+        self.editor.setMRMLScene(slicer.mrmlScene)
+        self.layout.addWidget(self.editor)
+        ############################################################################
+
+
+
 
         # Set scene in MRML widgets. Make sure that in Qt designer the top-level qMRMLWidget's
         # "mrmlSceneChanged(vtkMRMLScene*)" signal in is connected to each MRML widget's.
@@ -176,9 +190,45 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Buttons
         self.ui.pbSendImage.connect('clicked(bool)', lambda: self.logic.sendImage())
         self.ui.pbSegment.connect('clicked(bool)', lambda: self.logic.applySegmentation())
+        self.ui.pbCTprep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.logic.preprocess_CT))
+        self.ui.pbMRprep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.logic.preprocess_MR))
+        self.ui.pbAttach.connect('clicked(bool)', lambda: self._createAndAttachROI())
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
+    
+
+    def selectParameterNode(self):
+        # Select parameter set node if one is found in the scene, and create one otherwise
+        segmentEditorSingletonTag = "SegmentEditor"
+        segmentEditorNode = slicer.mrmlScene.GetSingletonNode(segmentEditorSingletonTag, "vtkMRMLSegmentEditorNode")
+        if segmentEditorNode is None:
+            segmentEditorNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLSegmentEditorNode")
+            segmentEditorNode.UnRegister(None)
+            segmentEditorNode.SetSingletonTag(segmentEditorSingletonTag)
+            segmentEditorNode = slicer.mrmlScene.AddNode(segmentEditorNode)
+        if self.parameterSetNode == segmentEditorNode:
+            # nothing changed
+            return
+        self.parameterSetNode = segmentEditorNode
+        self.editor.setMRMLSegmentEditorNode(self.parameterSetNode)
+
+    def _createAndAttachROI(self):
+        # Make sure there is only one 'R'
+        volumeNode = slicer.util.getNode('HCC_004_0000')
+
+        # Create a new ROI that will be fit to volumeNode
+        roiNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsROINode", "R")
+
+        cropVolumeParameters = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLCropVolumeParametersNode")
+        cropVolumeParameters.SetInputVolumeNodeID(volumeNode.GetID())
+        cropVolumeParameters.SetROINodeID(roiNode.GetID())
+        slicer.modules.cropvolume.logic().SnapROIToVoxelGrid(cropVolumeParameters)  # optional (rotates the ROI to match the volume axis directions)
+        slicer.modules.cropvolume.logic().FitROIToInputVolume(cropVolumeParameters)
+        slicer.mrmlScene.RemoveNode(cropVolumeParameters)
+
+        self.ui.widgetROI.setMRMLMarkupsNode(slicer.util.getNode("R"))
+
 
     def cleanup(self) -> None:
         """
@@ -260,6 +310,8 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
     Uses ScriptedLoadableModuleLogic base class, available at:
     https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
     """
+    image_data = None
+    segment_res_group = None
 
     def __init__(self) -> None:
         """
@@ -307,16 +359,19 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
         stopTime = time.time()
         logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
     
-    def sendImage(self, serverUrl='http://127.0.0.1:5555', numpyServerAddress=("0.0.0.0", 5556)):
-        print('sending setImage request...')
-        response = requests.post(f'{serverUrl}/setImage', json={"wmin": -160, "wmax": 240}) # wmin, wmax as input?
-        print('Response from setImage:', response.text)
-
+    def captureImage(self):
         ######## Set your image path here
         self.volume_node = slicer.util.getNodesByClass('vtkMRMLScalarVolumeNode')[0]
         self.img_path = self.volume_node.GetStorageNode().GetFullNameFromFileName()
         self.img_sitk = sitk.ReadImage(self.img_path)
         self.image_data = slicer.util.arrayFromVolume(self.volume_node)  ################ Only one node?
+    
+    def sendImage(self, serverUrl='http://127.0.0.1:5555', numpyServerAddress=("0.0.0.0", 5556)):
+        print('sending setImage request...')
+        response = requests.post(f'{serverUrl}/setImage', json={"wmin": -160, "wmax": 240}) # wmin, wmax as input?
+        print('Response from setImage:', response.text)
+
+        self.captureImage()
         with NumpySocket() as s:
             s.connect(numpyServerAddress)
             print("sending numpy array:")
@@ -341,11 +396,16 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
         seg_sitk = sitk.GetImageFromArray(segmentation_mask)
         seg_sitk.CopyInformation(self.img_sitk)
         sitk.WriteImage(seg_sitk, segmentation_res_file) ########## Set your segmentation output here
-        slicer.util.loadSegmentation(segmentation_res_file)
-        # segment_volume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode")
-        # segment_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode")
-        # slicer.util.updateVolumeFromArray(segment_volume, segmentation_mask)
-        # slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(segment_volume, segment_node)
+        loaded_seg_file = slicer.util.loadSegmentation(segmentation_res_file)
+
+        segment_volume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode")
+        slicer.modules.segmentations.logic().ExportAllSegmentsToLabelmapNode(loaded_seg_file, segment_volume, slicer.vtkSegmentation.EXTENT_REFERENCE_GEOMETRY)
+
+        if self.segment_res_group is None:
+          self.segment_res_group = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode")
+        slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(segment_volume, self.segment_res_group)
+        slicer.mrmlScene.RemoveNode(segment_volume)
+        slicer.mrmlScene.RemoveNode(loaded_seg_file)
     
     def applySegmentation(self, serverUrl='http://127.0.0.1:5555'):
         segmentation_mask = self.inferSegmentation(serverUrl)
@@ -386,6 +446,31 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
         slice_idx = int((zrange[0] + zrange[1]) / 2) # it is not accurate
 
         return slice_idx, bbox, zrange
+    
+    def preprocess_CT(self, win_level=40.0, win_width=400.0):
+        if self.image_data is None:
+            self.captureImage()
+        lower_bound, upper_bound = win_level - win_width/2, win_level + win_width/2
+        image_data_pre = np.clip(self.image_data, lower_bound, upper_bound)
+        image_data_pre = (image_data_pre - np.min(image_data_pre))/(np.max(image_data_pre)-np.min(image_data_pre))*255.0
+        image_data_pre = np.uint8(image_data_pre)
+        return image_data_pre
+    
+    def preprocess_MR(self, lower_percent=0.5, upper_percent=99.5):
+        if self.image_data is None:
+            self.captureImage()
+        lower_bound, upper_bound = np.percentile(self.image_data[self.image_data > 0], lower_percent), np.percentile(self.image_data[self.image_data > 0], upper_percent)
+        image_data_pre = np.clip(self.image_data, lower_bound, upper_bound)
+        image_data_pre = (image_data_pre - np.min(image_data_pre))/(np.max(image_data_pre)-np.min(image_data_pre))*255.0
+        image_data_pre = np.uint8(image_data_pre)
+        return image_data_pre
+    
+    def updateImage(self, new_image):
+        self.image_data[:,:,:] = new_image
+        slicer.util.arrayFromVolumeModified(self.volume_node)
+    
+    def applyPreprocess(self, method):
+        self.updateImage(method())
 
 
 #

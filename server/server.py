@@ -203,12 +203,15 @@ def get_image(wmin: int, wmax: int):
             arr = conn.recv()
             print(arr.shape)
 
+        ###########################################################
+        ### This should be handled during preprocessing
+        ###########################################################
         # windowlization
+        wmin = np.min(arr) - 1
+        wmax = np.max(arr) + 1
+        print('wmin: %g, wmax: %g'%(wmin, wmax))
         arr = np.clip(arr, wmin, wmax)
         arr = (arr - wmin) / (wmax - wmin) * 255
-
-        # arr = np.rot90(arr, k=3, axes=(1, 2))
-        # arr = np.transpose(arr, (0, 2, 1)) #################### This line is causing problem
 
         # print(arr.shape)
         # TODO: add restrictions on image dimension
@@ -243,7 +246,7 @@ def get_image(wmin: int, wmax: int):
                 img_1024.max() - img_1024.min(), a_min=1e-8, a_max=None
         )  # normalize to [0, 1], (H, W, 3)
         # convert the shape to (3, H, W)
-        # plt.imsave('slices_debug/slice_%d.png'%slice_idx, img_1024)
+        plt.imsave('slices_debug/slice_%d.png'%slice_idx, img_1024)
         img_1024_tensor = (
                 torch.tensor(img_1024).float().permute(2, 0, 1).unsqueeze(0).to(device)
         )
