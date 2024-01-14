@@ -62,7 +62,7 @@ def medsam_inference(medsam_model, img_embed, box_1024, height, width):
 
 # settings and app states
 SAM_MODEL_TYPE = "vit_b"
-MedSAM_CKPT_PATH = "medsam_lite.pth"
+MedSAM_CKPT_PATH = "/home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer/medsam_lite.pth"
 MEDSAM_IMG_INPUT_SIZE = 1024
 device = 'cpu'#torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -203,26 +203,26 @@ def get_image(wmin: int, wmax: int):
             arr = conn.recv()
             print(arr.shape)
 
-        ###########################################################
-        ### This should be handled during preprocessing
-        ###########################################################
-        # windowlization
-        wmin = np.min(arr) - 1
-        wmax = np.max(arr) + 1
-        print('wmin: %g, wmax: %g'%(wmin, wmax))
-        arr = np.clip(arr, wmin, wmax)
-        arr = (arr - wmin) / (wmax - wmin) * 255
+            ###########################################################
+            ### This should be handled during preprocessing
+            ###########################################################
+            # windowlization
+            wmin = np.min(arr) - 1
+            wmax = np.max(arr) + 1
+            print('wmin: %g, wmax: %g'%(wmin, wmax))
+            arr = np.clip(arr, wmin, wmax)
+            arr = (arr - wmin) / (wmax - wmin) * 255
 
-        # print(arr.shape)
-        # TODO: add restrictions on image dimension
-        # assert (
-            #     len(arr.shape) == 2 or arr.shape[-1] == 3
-        # ), f"Accept either 1 channel gray image or 3 channel rgb. Got image shape {arr.shape} "
-        image = arr
-        # H, W = arr.shape[1:]  # TODO: make sure h, w not filpped  #################### This line is causing problem
-        W, H = arr.shape[1:]
+            # print(arr.shape)
+            # TODO: add restrictions on image dimension
+            # assert (
+                #     len(arr.shape) == 2 or arr.shape[-1] == 3
+            # ), f"Accept either 1 channel gray image or 3 channel rgb. Got image shape {arr.shape} "
+            image = arr
+            # H, W = arr.shape[1:]  # TODO: make sure h, w not filpped  #################### This line is causing problem
+            W, H = arr.shape[1:]
 
-    for slice_idx in tqdm(range(image.shape[0])):
+    for slice_idx in range(image.shape[0]):
     # for slice_idx in tqdm(range(4)):
         slc = image[slice_idx]
 
@@ -246,7 +246,7 @@ def get_image(wmin: int, wmax: int):
                 img_1024.max() - img_1024.min(), a_min=1e-8, a_max=None
         )  # normalize to [0, 1], (H, W, 3)
         # convert the shape to (3, H, W)
-        plt.imsave('slices_debug/slice_%d.png'%slice_idx, img_1024)
+        # plt.imsave('slices_debug/slice_%d.png'%slice_idx, img_1024)
         img_1024_tensor = (
                 torch.tensor(img_1024).float().permute(2, 0, 1).unsqueeze(0).to(device)
         )
@@ -285,6 +285,11 @@ def set_image(params: ImageParams, background_tasks: BackgroundTasks):
     return
 
 
+@app.post("/getProgress")
+def get_progress():
+    return json.dumps({'layers': image.shape[0], 'generated_embeds': len(embeddings)})
+
+
 class InferenceParams(BaseModel):
     slice_idx: int
     bbox: list[int]  # (xmin, ymin, xmax, ymax), origional size
@@ -309,7 +314,7 @@ def infer(params: InferenceParams):
         res[csidx], bbox_1024_prev = inf(bbox_1024_prev)
         if csidx == params.slice_idx:
             bbox_1024_center_inf = bbox_1024_prev.copy()
-            plt.imsave('server_mask.png', res[csidx])
+            # plt.imsave('server_mask.png', res[csidx])
 
     bbox_1024_prev = bbox_1024_center_inf
     for csidx in range(params.slice_idx-1, zmin, -1):

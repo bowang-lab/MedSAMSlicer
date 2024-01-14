@@ -1,3 +1,5 @@
+# Hardcoded File: /home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer/
+
 import logging
 import os
 from typing import Annotated, Optional
@@ -8,6 +10,11 @@ import vtk
 import requests
 import SimpleITK as sitk
 import numpy as np
+import subprocess
+import atexit
+import os
+import signal
+import threading
 
 import slicer
 from slicer.ScriptedLoadableModule import *
@@ -18,6 +25,9 @@ from slicer.parameterNodeWrapper import (
 )
 
 from slicer import vtkMRMLScalarVolumeNode
+
+from PythonQt.QtCore import QTimer, QByteArray
+from PythonQt.QtGui import QIcon, QPixmap
 
 try:
     from numpysocket import NumpySocket
@@ -153,6 +163,45 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         """
         ScriptedLoadableModuleWidget.setup(self)
 
+        # Create logic class. Logic implements all computations that should be possible to run
+        # in batch mode, without a graphical user interface.
+        self.logic = t_SegmentDataLogic()
+
+        DEPENDENCIES_AVAILABLE = False
+
+        # Initial Dependency Setup
+        if os.path.isfile('medsam_info') and os.path.isfile(open('medsam_info', 'r').read() + '/server.py'):
+            print('Here 1')
+            try:
+                from segment_anything.modeling import MaskDecoder
+                DEPENDENCIES_AVAILABLE = True
+                print('Here 2')
+            except:
+                DEPENDENCIES_AVAILABLE = False
+                print('Here 3')
+        else:
+            DEPENDENCIES_AVAILABLE = False
+            print('Here 4')
+
+        if not DEPENDENCIES_AVAILABLE:
+            from PythonQt.QtGui import QLabel, QPushButton, QSpacerItem, QSizePolicy
+            import ctk
+            path_instruction = QLabel('Choose a folder to install module dependencies in')
+            restart_instruction = QLabel('Restart 3D Slicer after all dependencies are installed!')
+
+            ctk_install_path = ctk.ctkPathLineEdit()
+            ctk_install_path.filters = ctk.ctkPathLineEdit.Dirs
+
+            install_btn = QPushButton('Install dependencies')
+            install_btn.clicked.connect(lambda: self.logic.install_dependencies(ctk_install_path))
+
+            self.layout.addWidget(path_instruction)
+            self.layout.addWidget(ctk_install_path)
+            self.layout.addWidget(install_btn)
+            self.layout.addWidget(restart_instruction)
+            
+            return
+
         # Load widget from .ui file (created by Qt Designer).
         # Additional widgets can be instantiated manually and added to self.layout.
         uiWidget = slicer.util.loadUI(self.resourcePath('UI/t_SegmentData.ui'))
@@ -161,25 +210,21 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
 
         ############################################################################
+        # Segmentation Module
         import qSlicerSegmentationsModuleWidgetsPythonQt
         self.editor = qSlicerSegmentationsModuleWidgetsPythonQt.qMRMLSegmentEditorWidget()
         self.editor.setMaximumNumberOfUndoStates(10)
         self.selectParameterNode()
         self.editor.setMRMLScene(slicer.mrmlScene)
-        self.layout.addWidget(self.editor)
+        # print(self.ui.clbtnOperation.layout().__dict__)
+        self.ui.clbtnOperation.layout().addWidget(self.editor)
+        # self.layout.addWidget(self.editor)
         ############################################################################
-
-
-
 
         # Set scene in MRML widgets. Make sure that in Qt designer the top-level qMRMLWidget's
         # "mrmlSceneChanged(vtkMRMLScene*)" signal in is connected to each MRML widget's.
         # "setMRMLScene(vtkMRMLScene*)" slot.
         uiWidget.setMRMLScene(slicer.mrmlScene)
-
-        # Create logic class. Logic implements all computations that should be possible to run
-        # in batch mode, without a graphical user interface.
-        self.logic = t_SegmentDataLogic()
 
         # Connections
 
@@ -190,9 +235,14 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Buttons
         self.ui.pbSendImage.connect('clicked(bool)', lambda: self.logic.sendImage())
         self.ui.pbSegment.connect('clicked(bool)', lambda: self.logic.applySegmentation())
+
+        self.ui.pbCTprep.setIcon(QIcon('/home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/CT.jpg'))
         self.ui.pbCTprep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.logic.preprocess_CT))
+        self.ui.pbMRprep.setIcon(QIcon('/home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MR.png'))
         self.ui.pbMRprep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.logic.preprocess_MR))
+        
         self.ui.pbAttach.connect('clicked(bool)', lambda: self._createAndAttachROI())
+        self.ui.pbTwoDim.connect('clicked(bool)', lambda: self.makeROI2D())
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
@@ -212,10 +262,13 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             return
         self.parameterSetNode = segmentEditorNode
         self.editor.setMRMLSegmentEditorNode(self.parameterSetNode)
-
+    
+    
     def _createAndAttachROI(self):
         # Make sure there is only one 'R'
-        volumeNode = slicer.util.getNode('HCC_004_0000')
+        if self.logic.volume_node is None:
+            self.logic.volume_node = slicer.util.getNodesByClass('vtkMRMLScalarVolumeNode')[0]
+        volumeNode = self.logic.volume_node
 
         # Create a new ROI that will be fit to volumeNode
         roiNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsROINode", "R")
@@ -228,6 +281,14 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         slicer.mrmlScene.RemoveNode(cropVolumeParameters)
 
         self.ui.widgetROI.setMRMLMarkupsNode(slicer.util.getNode("R"))
+    
+    def makeROI2D(self):
+        # Make sure there is exactly one 'R'
+        roiNode = slicer.util.getNode('R')
+        roi_size = roiNode.GetSize()
+        roiNode.SetSize(roi_size[0], roi_size[1], 1)
+        roi_center = np.array(roiNode.GetCenter())
+        roiNode.SetCenter([roi_center[0], roi_center[1], slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetSliceOffset()])
 
 
     def cleanup(self) -> None:
@@ -312,6 +373,11 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
     """
     image_data = None
     segment_res_group = None
+    server_ready = False
+    server_process = None
+    volume_node = None
+    timer = None
+    progressbar = None
 
     def __init__(self) -> None:
         """
@@ -359,6 +425,95 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
         stopTime = time.time()
         logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
     
+    def pip_install_wrapper(self, command, event):
+        slicer.util.pip_install(command)
+        event.set()
+    
+    def install_dependencies(self, ctk_path):
+        # Hardcoded File: /home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer/
+        dependencies = {
+            'PyTorch': 'torch==2.0.1 torchvision==0.15.2',
+            'Numpy Socket': 'numpysocket',
+            'FastAPI': 'fastapi',
+            'Uvicorn': 'uvicorn',
+            'MedSam Lite Server': '-e /home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer'
+        }
+
+        if ctk_path.currentPath == '':
+            print('Installation path is empty')
+            return
+        
+        print('Installation will happen in %s'%ctk_path.currentPath)
+        with open('medsam_info', 'w') as fp:
+            fp.write(ctk_path.currentPath)
+        return
+
+        self.progressbar = slicer.util.createProgressDialog(autoClose=False)
+        self.progressbar.minimum = 0
+        self.progressbar.maximum = 0
+        self.progressbar.setLabelText('Installing dependencies...')
+
+        for dependency in dependencies:
+            pip_install_event = threading.Event()
+            dep_thread = threading.Thread(target=self.pip_install_wrapper, args=(dependencies[dependency], pip_install_event,))
+            dep_thread.start()
+            self.progressbar.setLabelText('Installing dependencies: %s'%dependency)
+            while not pip_install_event.is_set():
+                slicer.app.processEvents()
+            dep_thread.join()
+        
+        self.progressbar.close()
+
+    
+    def run_server(self):
+        print('Running server...')
+        
+        # buggy_file_path = os.getcwd() + '/lib/Python/lib/python3.9/site-packages/typing_extensions.py'
+
+        # with open(buggy_file_path, 'r') as file:
+        #     lines = file.readlines()
+
+        # # Update the value in line 173
+        # buggy_line_num = 173
+        # new_value = '\t\t\tt, (typing._GenericAlias, _types.GenericAlias, _types.UnionType)'
+
+        # if 1 <= buggy_line_num <= len(lines):
+        #     lines[buggy_line_num - 1] = f"{new_value}\n"
+
+        # # Write the updated content back to the file
+        # with open(buggy_file_path, 'w') as file:
+        #     file.writelines(lines)
+        
+
+        self.server_process = subprocess.Popen(['PythonSlicer', '/home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer/server.py'])#, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, start_new_session=True)
+        def cleanup():
+            timeout_sec = 5
+
+            p_sec = 0
+            for second in range(timeout_sec):
+                if self.server_process.poll() == None:
+                    time.sleep(1)
+                    p_sec += 1
+            if p_sec >= timeout_sec:
+                self.server_process.kill()
+        # atexit.register(cleanup)
+
+        self.server_ready = True
+
+        time.sleep(4) #Change
+
+    
+    def progressCheck(self, serverUrl='http://127.0.0.1:5555'):
+        response = requests.post(f'{serverUrl}/getProgress')
+        progress_data = json.loads(response.json())
+        self.progressbar.value = progress_data['generated_embeds']
+        # slicer.app.processEvents()
+
+        if int(progress_data['layers']) == int(progress_data['generated_embeds']):
+            self.progressbar.close()
+            self.timer.stop()
+
+    
     def captureImage(self):
         ######## Set your image path here
         self.volume_node = slicer.util.getNodesByClass('vtkMRMLScalarVolumeNode')[0]
@@ -367,6 +522,8 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
         self.image_data = slicer.util.arrayFromVolume(self.volume_node)  ################ Only one node?
     
     def sendImage(self, serverUrl='http://127.0.0.1:5555', numpyServerAddress=("0.0.0.0", 5556)):
+        if not self.server_ready:
+            self.run_server()
         print('sending setImage request...')
         response = requests.post(f'{serverUrl}/setImage', json={"wmin": -160, "wmax": 240}) # wmin, wmax as input?
         print('Response from setImage:', response.text)
@@ -376,6 +533,19 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
             s.connect(numpyServerAddress)
             print("sending numpy array:")
             s.sendall(self.image_data)
+        
+        ###########################
+        # Timer
+        if self.timer is None:
+            self.timer = QTimer()
+            self.timer.timeout.connect(self.progressCheck)
+        ###########################
+        self.progressbar = slicer.util.createProgressDialog(autoClose=False)
+        self.progressbar.minimum = 0
+        self.progressbar.maximum = self.image_data.shape[0]
+        self.progressbar.setLabelText('Preparing image embeddings...')
+
+        self.timer.start(1000)
 
     def inferSegmentation(self, serverUrl='http://127.0.0.1:5555'):
         print('sending infer request...')
@@ -403,6 +573,7 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
 
         if self.segment_res_group is None:
           self.segment_res_group = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode")
+          self.segment_res_group.SetReferenceImageGeometryParameterFromVolumeNode(self.volume_node)
         slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(segment_volume, self.segment_res_group)
         slicer.mrmlScene.RemoveNode(segment_volume)
         slicer.mrmlScene.RemoveNode(loaded_seg_file)
@@ -450,19 +621,31 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
     def preprocess_CT(self, win_level=40.0, win_width=400.0):
         if self.image_data is None:
             self.captureImage()
+        # self.volume_node.GetDisplayNode().SetThreshold(0, 255)
+        # self.volume_node.GetDisplayNode().ApplyThresholdOn()
+        
         lower_bound, upper_bound = win_level - win_width/2, win_level + win_width/2
         image_data_pre = np.clip(self.image_data, lower_bound, upper_bound)
         image_data_pre = (image_data_pre - np.min(image_data_pre))/(np.max(image_data_pre)-np.min(image_data_pre))*255.0
         image_data_pre = np.uint8(image_data_pre)
+
+        self.volume_node.GetDisplayNode().SetAutoWindowLevel(False)
+        self.volume_node.GetDisplayNode().SetWindowLevelMinMax(0, 255)
+        
         return image_data_pre
     
     def preprocess_MR(self, lower_percent=0.5, upper_percent=99.5):
         if self.image_data is None:
             self.captureImage()
+        
         lower_bound, upper_bound = np.percentile(self.image_data[self.image_data > 0], lower_percent), np.percentile(self.image_data[self.image_data > 0], upper_percent)
         image_data_pre = np.clip(self.image_data, lower_bound, upper_bound)
         image_data_pre = (image_data_pre - np.min(image_data_pre))/(np.max(image_data_pre)-np.min(image_data_pre))*255.0
         image_data_pre = np.uint8(image_data_pre)
+
+        self.volume_node.GetDisplayNode().SetAutoWindowLevel(False)
+        self.volume_node.GetDisplayNode().SetWindowLevelMinMax(0, 255)
+
         return image_data_pre
     
     def updateImage(self, new_image):
