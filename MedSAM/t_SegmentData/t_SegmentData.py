@@ -15,6 +15,7 @@ import atexit
 import os
 import signal
 import threading
+import zipfile
 
 import slicer
 from slicer.ScriptedLoadableModule import *
@@ -23,6 +24,8 @@ from slicer.parameterNodeWrapper import (
     parameterNodeWrapper,
     WithinRange,
 )
+
+from urllib.request import urlopen
 
 from slicer import vtkMRMLScalarVolumeNode
 
@@ -171,19 +174,16 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Initial Dependency Setup
         if os.path.isfile('medsam_info') and os.path.isfile(open('medsam_info', 'r').read() + '/server.py'):
-            print('Here 1')
             try:
                 from segment_anything.modeling import MaskDecoder
                 DEPENDENCIES_AVAILABLE = True
-                print('Here 2')
             except:
                 DEPENDENCIES_AVAILABLE = False
-                print('Here 3')
         else:
             DEPENDENCIES_AVAILABLE = False
-            print('Here 4')
 
-        if not DEPENDENCIES_AVAILABLE:
+        # if not DEPENDENCIES_AVAILABLE:
+        if True:
             from PythonQt.QtGui import QLabel, QPushButton, QSpacerItem, QSizePolicy
             import ctk
             path_instruction = QLabel('Choose a folder to install module dependencies in')
@@ -263,7 +263,7 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.parameterSetNode = segmentEditorNode
         self.editor.setMRMLSegmentEditorNode(self.parameterSetNode)
     
-    
+
     def _createAndAttachROI(self):
         # Make sure there is only one 'R'
         if self.logic.volume_node is None:
@@ -429,6 +429,23 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
         slicer.util.pip_install(command)
         event.set()
     
+    def download_wrapper(self, url, filename, event):
+        with urlopen(url) as r:
+            # self.setTotalProgress.emit(int(r.info()["Content-Length"]))
+            with open(filename, "ab") as f:
+                while True:
+                    chunk = r.read(1024)
+                    if chunk is None:
+                        continue
+                    elif chunk == b"":
+                        break
+                    f.write(chunk)
+        
+        with zipfile.ZipFile(filename, 'r') as zip_ref:
+            zip_ref.extractall(os.path.dirname(filename))
+        
+        event.set()
+    
     def install_dependencies(self, ctk_path):
         # Hardcoded File: /home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer/
         dependencies = {
@@ -446,24 +463,32 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
         print('Installation will happen in %s'%ctk_path.currentPath)
         with open('medsam_info', 'w') as fp:
             fp.write(ctk_path.currentPath)
+        
+        file_url = 'https://github.com/rasakereh/medsam-3dslicer/raw/master/server_essentials.zip'
+        filename = os.path.join(ctk_path.currentPath, 'server_essentials.zip')
+        
+        self.run_on_background(self.download_wrapper, (file_url, filename), 'Downloading additional files...')
+
         return
 
+        for dependency in dependencies:
+            self.run_on_background(self.pip_install_wrapper, (dependencies[dependency],), 'Installing dependencies: %s'%dependency)
+    
+
+    def run_on_background(self, target, args, title):
         self.progressbar = slicer.util.createProgressDialog(autoClose=False)
         self.progressbar.minimum = 0
         self.progressbar.maximum = 0
-        self.progressbar.setLabelText('Installing dependencies...')
-
-        for dependency in dependencies:
-            pip_install_event = threading.Event()
-            dep_thread = threading.Thread(target=self.pip_install_wrapper, args=(dependencies[dependency], pip_install_event,))
-            dep_thread.start()
-            self.progressbar.setLabelText('Installing dependencies: %s'%dependency)
-            while not pip_install_event.is_set():
-                slicer.app.processEvents()
-            dep_thread.join()
+        self.progressbar.setLabelText(title)
         
-        self.progressbar.close()
+        pip_install_event = threading.Event()
+        dep_thread = threading.Thread(target=target, args=(*args, pip_install_event,))
+        dep_thread.start()
+        while not pip_install_event.is_set():
+            slicer.app.processEvents()
+        dep_thread.join()
 
+        self.progressbar.close()
     
     def run_server(self):
         print('Running server...')
