@@ -173,7 +173,7 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         DEPENDENCIES_AVAILABLE = False
 
         # Initial Dependency Setup
-        if os.path.isfile('medsam_info') and os.path.isfile(open('medsam_info', 'r').read() + '/server.py'):
+        if os.path.isfile('medsam_info') and os.path.isfile(os.path.join(open('medsam_info', 'r').read(), 'server_essentials/server.py')):
             try:
                 from segment_anything.modeling import MaskDecoder
                 DEPENDENCIES_AVAILABLE = True
@@ -182,8 +182,7 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         else:
             DEPENDENCIES_AVAILABLE = False
 
-        # if not DEPENDENCIES_AVAILABLE:
-        if True:
+        if not DEPENDENCIES_AVAILABLE:
             from PythonQt.QtGui import QLabel, QPushButton, QSpacerItem, QSizePolicy
             import ctk
             path_instruction = QLabel('Choose a folder to install module dependencies in')
@@ -201,6 +200,8 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.layout.addWidget(restart_instruction)
             
             return
+        
+        self.logic.server_dir = os.path.join(open('medsam_info', 'r').read(), 'server_essentials')
 
         # Load widget from .ui file (created by Qt Designer).
         # Additional widgets can be instantiated manually and added to self.layout.
@@ -236,9 +237,9 @@ class t_SegmentDataWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.pbSendImage.connect('clicked(bool)', lambda: self.logic.sendImage())
         self.ui.pbSegment.connect('clicked(bool)', lambda: self.logic.applySegmentation())
 
-        self.ui.pbCTprep.setIcon(QIcon('/home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/CT.jpg'))
+        self.ui.pbCTprep.setIcon(QIcon(os.path.join(self.logic.server_dir, 'CT.jpg')))
         self.ui.pbCTprep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.logic.preprocess_CT))
-        self.ui.pbMRprep.setIcon(QIcon('/home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MR.png'))
+        self.ui.pbMRprep.setIcon(QIcon(os.path.join(self.logic.server_dir, 'MR.png')))
         self.ui.pbMRprep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.logic.preprocess_MR))
         
         self.ui.pbAttach.connect('clicked(bool)', lambda: self._createAndAttachROI())
@@ -378,6 +379,7 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
     volume_node = None
     timer = None
     progressbar = None
+    server_dir = None
 
     def __init__(self) -> None:
         """
@@ -447,15 +449,6 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
         event.set()
     
     def install_dependencies(self, ctk_path):
-        # Hardcoded File: /home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer/
-        dependencies = {
-            'PyTorch': 'torch==2.0.1 torchvision==0.15.2',
-            'Numpy Socket': 'numpysocket',
-            'FastAPI': 'fastapi',
-            'Uvicorn': 'uvicorn',
-            'MedSam Lite Server': '-e /home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer'
-        }
-
         if ctk_path.currentPath == '':
             print('Installation path is empty')
             return
@@ -469,7 +462,15 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
         
         self.run_on_background(self.download_wrapper, (file_url, filename), 'Downloading additional files...')
 
-        return
+        self.server_dir = os.path.join(ctk_path.currentPath, 'server_essentials')
+
+        dependencies = {
+            'PyTorch': 'torch==2.0.1 torchvision==0.15.2',
+            'Numpy Socket': 'numpysocket',
+            'FastAPI': 'fastapi',
+            'Uvicorn': 'uvicorn',
+            'MedSam Lite Server': '-e %s'%(self.server_dir)
+        }
 
         for dependency in dependencies:
             self.run_on_background(self.pip_install_wrapper, (dependencies[dependency],), 'Installing dependencies: %s'%dependency)
@@ -510,7 +511,7 @@ class t_SegmentDataLogic(ScriptedLoadableModuleLogic):
         #     file.writelines(lines)
         
 
-        self.server_process = subprocess.Popen(['PythonSlicer', '/home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer/server.py'])#, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, start_new_session=True)
+        self.server_process = subprocess.Popen(['PythonSlicer', os.path.join(self.server_dir, 'server.py')])#, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, start_new_session=True)
         def cleanup():
             timeout_sec = 5
 
