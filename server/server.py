@@ -2,6 +2,7 @@
 import sys
 import time
 import json
+import os
 
 from tqdm import tqdm
 from fastapi import FastAPI, BackgroundTasks
@@ -62,7 +63,8 @@ def medsam_inference(medsam_model, img_embed, box_1024, height, width):
 
 # settings and app states
 SAM_MODEL_TYPE = "vit_b"
-MedSAM_CKPT_PATH = "/home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer/medsam_lite.pth"
+PARENT_DIR = os.path.dirname(os.path.abspath(__file__))
+MedSAM_CKPT_PATH = os.path.join(PARENT_DIR , "medsam_lite.pth")
 MEDSAM_IMG_INPUT_SIZE = 1024
 device = 'cpu'#torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 

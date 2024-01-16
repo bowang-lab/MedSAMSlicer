@@ -460,7 +460,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         
         self.run_on_background(self.download_wrapper, (file_url, filename), 'Downloading additional files...')
 
-        self.server_dir = os.path.join(ctk_path.currentPath, 'server_essentials')
+        self.server_dir = os.path.join(ctk_path.currentPath + '/', 'server_essentials')
 
         dependencies = {
             'PyTorch': 'torch==2.0.1 torchvision==0.15.2',
@@ -545,7 +545,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         self.img_sitk = sitk.ReadImage(self.img_path)
         self.image_data = slicer.util.arrayFromVolume(self.volume_node)  ################ Only one node?
     
-    def sendImage(self, serverUrl='http://127.0.0.1:5555', numpyServerAddress=("0.0.0.0", 5556)):
+    def sendImage(self, serverUrl='http://127.0.0.1:5555', numpyServerAddress=("127.0.0.1", 5556)):
         if not self.server_ready:
             self.run_server()
         print('sending setImage request...')
