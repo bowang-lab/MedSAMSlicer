@@ -2,6 +2,12 @@
 
 This is the official repository for 3D Slicer Plugin for MedSAM: Segment Anything in Medical Images.
 
+
+
+https://github.com/bowang-lab/MedSAMSlicer/assets/19947331/c7ef20f1-7e23-4e6c-8be1-e39931eeb841
+
+
+
 ## Installation
 
 You can watch a video tutorial of installation steps [here](https://youtu.be/qjsTA5WXuS0).
@@ -11,7 +17,7 @@ You can watch a video tutorial of installation steps [here](https://youtu.be/qjs
 3. In the Slicer App, select the `Welcome to Slicer` drop-down menu in the toolbar at the top and navigate to `Developer Tools > Extension Wizard`.
 4. Click on `select Extension` and locate the `MedSAM` folder among the extracted files and directories at step 2. Accept if asked to add the new modules.
 5. Now, from the  `Welcome to Slicer` drop-down menu, under the `Segmentation` sub-menu, `MedSAMLite` option is added. By choosing it, you get to the final steps.
-6. Select a directory to download and install dependencies. It can take several minutes.
+6. `Choose a folder` to install module dependencies and click on `Install dependencies`. It can take several minutes.
 7. Restart 3D Slicer.
 
 ## Usage
