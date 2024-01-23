@@ -2,6 +2,12 @@
 
 This is the official repository for 3D Slicer Plugin for MedSAM: Segment Anything in Medical Images.
 
+
+
+https://github.com/bowang-lab/MedSAMSlicer/assets/19947331/c7ef20f1-7e23-4e6c-8be1-e39931eeb841
+
+
+
 ## Installation
 
 1. Install 3D Slicer from its official [website](https://download.slicer.org/). The compatibility of our plugin has been tested with 3D Slicer >= 5.4.0
