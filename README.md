@@ -4,6 +4,8 @@ This is the official repository for 3D Slicer Plugin for MedSAM: Segment Anythin
 
 ## Installation
 
+You can watch a video tutorial of installation steps [here](https://youtu.be/qjsTA5WXuS0).
+
 1. Install 3D Slicer from its official [website](https://download.slicer.org/). The compatibility of our plugin has been tested with 3D Slicer >= 5.4.0
 2. Download the specific version of the plugin from [releases](https://github.com/bowang-lab/MedSAMSlicer/releases) page and extract to your desired location.
 3. In the Slicer App, select the `Welcome to Slicer` drop-down menu in the toolbar at the top and navigate to `Developer Tools > Extension Wizard`.
@@ -13,6 +15,8 @@ This is the official repository for 3D Slicer Plugin for MedSAM: Segment Anythin
 7. Restart 3D Slicer.
 
 ## Usage
+
+You can watch a video guide for usage [here](https://youtu.be/24WtVbljr8g).
 
 1. From the  `Welcome to Slicer` drop-down menu, under the `Segmentation` sub-menu, `MedSAMLite` option is added. By choosing it, you get to the final steps.
 2. Load your image file.
