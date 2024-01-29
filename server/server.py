@@ -66,7 +66,7 @@ SAM_MODEL_TYPE = "vit_b"
 PARENT_DIR = os.path.dirname(os.path.abspath(__file__))
 MedSAM_CKPT_PATH = os.path.join(PARENT_DIR , "medsam_lite.pth")
 MEDSAM_IMG_INPUT_SIZE = 1024
-device = 'cpu'#torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 H, W = None, None
 image = None
@@ -260,6 +260,8 @@ def get_image(wmin: int, wmax: int):
 
 def get_bbox1024(mask_1024, bbox_shift=3):
     y_indices, x_indices = np.where(mask_1024 > 0)
+    if x_indices.shape[0] == 0:
+        return np.array([0, 0, bbox_shift, bbox_shift])
     x_min, x_max = np.min(x_indices), np.max(x_indices)
     y_min, y_max = np.min(y_indices), np.max(y_indices)
     # add perturbation to bounding box coordinates
