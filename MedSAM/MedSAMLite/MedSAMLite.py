@@ -683,10 +683,10 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         seg_sitk.CopyInformation(self.img_sitk)
         sitk.WriteImage(seg_sitk, segmentation_res_file) ########## Set your segmentation output here
         loaded_seg_file = slicer.util.loadSegmentation(segmentation_res_file)
-
+        
         segment_volume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode")
         slicer.modules.segmentations.logic().ExportAllSegmentsToLabelmapNode(loaded_seg_file, segment_volume, slicer.vtkSegmentation.EXTENT_REFERENCE_GEOMETRY)
-
+        
         current_seg_group = self.widget.editor.segmentationNode()
         if current_seg_group is None:
             if self.segment_res_group is None:
@@ -694,7 +694,14 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
                 self.segment_res_group.SetReferenceImageGeometryParameterFromVolumeNode(self.volume_node)
             current_seg_group = self.segment_res_group
 
-        slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(segment_volume, current_seg_group)
+        try:
+            check_if_node_is_removed = slicer.util.getNode(current_seg_group.GetID()) # if scene is closed and reopend, this line will raise an error
+            slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(segment_volume, current_seg_group)
+        except:
+            self.segment_res_group = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode")
+            self.segment_res_group.SetReferenceImageGeometryParameterFromVolumeNode(self.volume_node)
+            slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(segment_volume, self.segment_res_group)
+
         slicer.mrmlScene.RemoveNode(segment_volume)
         slicer.mrmlScene.RemoveNode(loaded_seg_file)
     
