@@ -222,7 +222,8 @@ def get_image(wmin: int, wmax: int):
             # ), f"Accept either 1 channel gray image or 3 channel rgb. Got image shape {arr.shape} "
             image = arr
             # H, W = arr.shape[1:]  # TODO: make sure h, w not filpped  #################### This line is causing problem
-            W, H = arr.shape[1:]
+            H, W = arr.shape[1:]
+            print('Line 225, H, W:', H, W, file=sys.stderr)
 
     for slice_idx in range(image.shape[0]):
     # for slice_idx in tqdm(range(4)):
@@ -266,6 +267,7 @@ def get_bbox1024(mask_1024, bbox_shift=3):
     y_min, y_max = np.min(y_indices), np.max(y_indices)
     # add perturbation to bounding box coordinates
     H, W = mask_1024.shape
+    print('Line 269, H, W:', H, W, file=sys.stderr)
     x_min = max(0, x_min - bbox_shift)
     x_max = min(W, x_max + bbox_shift)
     y_min = max(0, y_min - bbox_shift)

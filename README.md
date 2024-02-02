@@ -20,7 +20,11 @@ You can watch a video tutorial of installation steps [here](https://youtu.be/qjs
 6. `Choose a folder` to install module dependencies and click on `Install dependencies`. It can take several minutes.
 7. Restart 3D Slicer.
 
-**To update to a newer version:** Remove all pre-existing files from both step#2 and step#6 and install the new version as instructed before.
+## Upgrade
+
+**If you have version <= v0.02 installed:** Remove all pre-existing files from both step#2 and step#6 and install the new version as instructed before.
+
+**If you have version > v0.02 installed:** Use the *Upgrade Module* button at the top of the module interface to check for and install new updates.
 
 ## Usage
 

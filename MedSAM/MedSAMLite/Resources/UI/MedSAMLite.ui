@@ -12,18 +12,18 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
+    <widget class="QPushButton" name="pbUpgrade">
+     <property name="text">
+      <string>Upgrade Module</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="ctkCollapsibleButton" name="clbtnPreprocess">
      <property name="text">
       <string>Prepare Data</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_2">
-      <item row="0" column="0">
-       <widget class="QLabel" name="lblPrep">
-        <property name="text">
-         <string>Preprocessing Options:</string>
-        </property>
-       </widget>
-      </item>
       <item row="0" column="1">
        <widget class="QPushButton" name="pbCTprep">
         <property name="toolTip">
@@ -53,6 +53,13 @@
           <width>150</width>
           <height>150</height>
          </size>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="lblPrep">
+        <property name="text">
+         <string>Preprocessing Options:</string>
         </property>
        </widget>
       </item>
