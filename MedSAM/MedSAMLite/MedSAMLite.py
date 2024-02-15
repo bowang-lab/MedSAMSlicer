@@ -36,7 +36,7 @@ try:
 except:
     pass # no installation anymore, shorter plugin load
 
-MEDSAMLITE_VERSION = 'v0.03'
+MEDSAMLITE_VERSION = 'v0.04'
 
 #
 # MedSAMLite
@@ -232,6 +232,9 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
             self.ui.clbtnOperation.layout().addWidget(path_instruction, 0, 0)
             self.ui.clbtnOperation.layout().addWidget(self.model_path_widget, 0, 1)
+            
+            self.ui.clbtnOperation.layout().addWidget(self.ui.pbSendImage, 1, 0)
+            self.ui.clbtnOperation.layout().addWidget(self.ui.pbSegment, 1, 1)
         
         self.model_path_widget.currentPath = os.path.join(self.logic.server_dir, 'medsam_lite.pth')
         self.logic.new_model_loaded = True
@@ -647,7 +650,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         # Terminate whole server
         server_port = int(serverUrl.split(':')[-1])
         try:
-            server_process = list(filter(lambda proc: proc.laddr.port == server_port and psutil.Process(proc.pid).name() == 'python-real', psutil.net_connections()))[0]
+            server_process = list(filter(lambda proc: proc.laddr.port == server_port and 'python-real' in psutil.Process(proc.pid).name(), psutil.net_connections()))[0]
             psutil.Process(server_process.pid).terminate()
         except:
             pass
