@@ -63,8 +63,7 @@ def medsam_inference(medsam_model, img_embed, box_1024, height, width):
 
 # settings and app states
 SAM_MODEL_TYPE = "vit_b"
-PARENT_DIR = os.path.dirname(os.path.abspath(__file__))
-MedSAM_CKPT_PATH = os.path.join(PARENT_DIR , "medsam_lite.pth")
+MedSAM_CKPT_PATH = sys.argv[1]
 MEDSAM_IMG_INPUT_SIZE = 1024
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -292,6 +291,10 @@ def set_image(params: ImageParams, background_tasks: BackgroundTasks):
 @app.post("/getProgress")
 def get_progress():
     return json.dumps({'layers': image.shape[0], 'generated_embeds': len(embeddings)})
+
+@app.post("/getServerState")
+def get_server_state():
+    return json.dumps({'ready': True})
 
 
 class InferenceParams(BaseModel):
