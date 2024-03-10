@@ -28,7 +28,7 @@ from urllib.request import urlopen
 from slicer import vtkMRMLScalarVolumeNode
 
 from PythonQt.QtCore import QTimer, QByteArray
-from PythonQt.QtGui import QIcon, QPixmap
+from PythonQt.QtGui import QIcon, QPixmap, QMessageBox
 
 try:
     from numpysocket import NumpySocket
@@ -36,7 +36,7 @@ try:
 except:
     pass # no installation anymore, shorter plugin load
 
-MEDSAMLITE_VERSION = 'v0.04'
+MEDSAMLITE_VERSION = 'v0.05'
 
 #
 # MedSAMLite
@@ -253,6 +253,19 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # self.layout.addWidget(self.editor)
         # self.editor.currentSegmentIDChanged.connect(print)
         ############################################################################
+
+        ###########################################################################
+        # Volume load/close tracker
+        from PythonQt.qMRMLWidgets import qMRMLNodeComboBox
+
+        self.qNodeSelect = qMRMLNodeComboBox()
+        self.qNodeSelect.addEnabled = False
+        self.qNodeSelect.removeEnabled = False
+        self.qNodeSelect.nodeTypes = ['vtkMRMLScalarVolumeNode']
+        self.qNodeSelect.setMRMLScene(slicer.mrmlScene)
+        self.qNodeSelect.currentNodeChanged.connect(self.logic.volumeChanged)
+        self.logic.volumeChanged()
+        ###########################################################################
 
         # Set scene in MRML widgets. Make sure that in Qt designer the top-level qMRMLWidget's
         # "mrmlSceneChanged(vtkMRMLScene*)" signal in is connected to each MRML widget's.
@@ -673,7 +686,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         self.run_on_background(self.check_server, (serverUrl, 10), 'Backend is loading...')
 
     
-    def progressCheck(self, serverUrl='http://127.0.0.1:5555'):
+    def progressCheck(self, partial=False, serverUrl='http://127.0.0.1:5555'):
         response = requests.post(f'{serverUrl}/getProgress')
         progress_data = json.loads(response.json())
         self.progressbar.value = progress_data['generated_embeds']
@@ -682,19 +695,45 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         if int(progress_data['layers']) == int(progress_data['generated_embeds']):
             self.progressbar.close()
             self.timer.stop()
+            self.widget.ui.pbSegment.setEnabled(True)
+            if partial:
+                segmentation_mask = self.inferSegmentation(serverUrl)
+                self.showSegmentation(segmentation_mask)
+                self.widget.ui.pbSegment.setText('Single Segmentation')
+            else:
+                self.widget.ui.pbSegment.setText('Segmentation')
 
-    
+    def volumeChanged(self, node=None):
+        # self.widget.ui.pbSegment.setEnabled(False)
+        self.widget.ui.pbSegment.setText('Single Segmentation')
+
+
     def captureImage(self):
         ######## Set your image path here
         self.volume_node = slicer.util.getNodesByClass('vtkMRMLScalarVolumeNode')[0]
         self.image_data = slicer.util.arrayFromVolume(self.volume_node)  ################ Only one node?
     
-    def sendImage(self, serverUrl='http://127.0.0.1:5555', numpyServerAddress=("127.0.0.1", 5556)):
+    def sendImage(self, partial=False, serverUrl='http://127.0.0.1:5555', numpyServerAddress=("127.0.0.1", 5556)):
+        self.widget.ui.pbSegment.setEnabled(False)
+        self.widget.ui.pbSegment.setText('Sending image, please wait...')
+
         if self.new_model_loaded or not self.check_server(serverUrl, max_retries=1, event=None):
             self.run_server(serverUrl, numpyServerAddress)
             self.new_model_loaded = False
+        
+        ############ Partial segmentation
+        if partial:
+            ################ DEBUG MODE ################
+            if self.volume_node is None:
+                self.captureImage()
+            ################ DEBUG MODE ################
+            _, _, zrange = self.get_bounding_box()
+            zmin, zmax = zrange
+        else:
+            zmin, zmax = -1, -1
+
         print('sending setImage request...')
-        response = requests.post(f'{serverUrl}/setImage', json={"wmin": -160, "wmax": 240}) # wmin, wmax as input?
+        response = requests.post(f'{serverUrl}/setImage', json={"wmin": -160, "wmax": 240, "zmin": zmin, "zmax": zmax}) # wmin, wmax as input?
         print('Response from setImage:', response.text)
 
         self.captureImage()
@@ -707,7 +746,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         # Timer
         if self.timer is None:
             self.timer = QTimer()
-            self.timer.timeout.connect(self.progressCheck)
+            self.timer.timeout.connect(lambda: self.progressCheck(partial))
         ###########################
         self.progressbar = slicer.util.createProgressDialog(autoClose=False)
         self.progressbar.minimum = 0
@@ -715,7 +754,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         self.progressbar.setLabelText('Preparing image embeddings...')
 
         self.timer.start(1000)
-
+    
     def inferSegmentation(self, serverUrl='http://127.0.0.1:5555'):
         print('sending infer request...')
         ################ DEBUG MODE ################
@@ -760,7 +799,17 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
 
         slicer.mrmlScene.RemoveNode(segment_volume)
     
+    def singleSegmentation(self, serverUrl):
+        self.sendImage(partial=True, serverUrl=serverUrl)
+
+    
     def applySegmentation(self, serverUrl='http://127.0.0.1:5555'):
+        if self.widget.ui.pbSegment.text == 'Single Segmentation':
+            continueSingle = QMessageBox.question(None,'', "You are using single segmentation option which is faster but is not advised if you want multiple regions be segmented in one image. In that case click 'Send Image' button. Do you wish to continue with single segmentation?", QMessageBox.Yes | QMessageBox.No)
+            if continueSingle == QMessageBox.No: return
+            self.singleSegmentation(serverUrl)
+
+            return
         segmentation_mask = self.inferSegmentation(serverUrl)
         self.showSegmentation(segmentation_mask)
     

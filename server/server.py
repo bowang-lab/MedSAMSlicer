@@ -191,7 +191,7 @@ app = FastAPI()
 # receive number of slices, for each slice, receive the slice then calc embedding
 
 
-def get_image(wmin: int, wmax: int):
+def get_image(wmin: int, wmax: int, zmin: int, zmax: int):
     global image
     global H
     global W
@@ -251,8 +251,11 @@ def get_image(wmin: int, wmax: int):
         img_1024_tensor = (
                 torch.tensor(img_1024).float().permute(2, 0, 1).unsqueeze(0).to(device)
         )
-        with torch.no_grad():
-            embedding = medsam_model.image_encoder(img_1024_tensor)  # (1, 256, 64, 64)
+        if (zmax == -1) or (zmin <= slice_idx <= zmax):
+            with torch.no_grad():
+                embedding = medsam_model.image_encoder(img_1024_tensor)  # (1, 256, 64, 64)
+        else:
+            embedding = None
 
         embeddings.append(embedding)
 
@@ -275,6 +278,8 @@ def get_bbox1024(mask_1024, bbox_shift=3):
 class ImageParams(BaseModel):
     wmin: int
     wmax: int
+    zmin: int
+    zmax: int
 
 
 @app.post("/setImage")
@@ -284,7 +289,7 @@ def set_image(params: ImageParams, background_tasks: BackgroundTasks):
     image = None
     embeddings = []
     print(params.wmin, params.wmax)
-    background_tasks.add_task(get_image, wmin=params.wmin, wmax=params.wmax)
+    background_tasks.add_task(get_image, wmin=params.wmin, wmax=params.wmax, zmin=params.zmin, zmax=params.zmax)
     return
 
 
