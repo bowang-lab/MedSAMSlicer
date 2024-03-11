@@ -251,7 +251,7 @@ def get_image(wmin: int, wmax: int, zmin: int, zmax: int):
         img_1024_tensor = (
                 torch.tensor(img_1024).float().permute(2, 0, 1).unsqueeze(0).to(device)
         )
-        if (zmax == -1) or (zmin <= slice_idx <= zmax):
+        if (zmax == -1) or ((zmin-1) <= slice_idx <= (zmax+1)):
             with torch.no_grad():
                 embedding = medsam_model.image_encoder(img_1024_tensor)  # (1, 256, 64, 64)
         else:
@@ -312,8 +312,8 @@ class InferenceParams(BaseModel):
 def infer(params: InferenceParams):
     print(params.slice_idx, params.bbox, params.zrange)
     zmin, zmax = params.zrange
-    zmax += 1
-    zmin -= 1
+    zmax = min(zmax+1, len(embeddings))
+    zmin = max(zmin-1, 0)
     bbox_1024_prev = np.array([params.bbox]) / np.array([W, H, W, H]) * 256
     res = {}
     

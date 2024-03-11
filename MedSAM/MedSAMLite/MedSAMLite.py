@@ -280,7 +280,7 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Buttons
         self.ui.pbUpgrade.connect('clicked(bool)', lambda: self.logic.run_on_background(self.logic.upgrade, (True,), 'Checking for updates...'))
-        self.ui.pbSendImage.connect('clicked(bool)', lambda: self.logic.sendImage())
+        self.ui.pbSendImage.connect('clicked(bool)', lambda: self.logic.sendImage(partial=False))
         self.ui.pbSegment.connect('clicked(bool)', lambda: self.logic.applySegmentation())
 
         self.ui.pbCTprep.setIcon(QIcon(os.path.join(self.logic.server_dir, 'CT.jpg')))
@@ -744,9 +744,8 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         
         ###########################
         # Timer
-        if self.timer is None:
-            self.timer = QTimer()
-            self.timer.timeout.connect(lambda: self.progressCheck(partial))
+        self.timer = QTimer()
+        self.timer.timeout.connect(lambda: self.progressCheck(partial))
         ###########################
         self.progressbar = slicer.util.createProgressDialog(autoClose=False)
         self.progressbar.minimum = 0
@@ -805,7 +804,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
     
     def applySegmentation(self, serverUrl='http://127.0.0.1:5555'):
         if self.widget.ui.pbSegment.text == 'Single Segmentation':
-            continueSingle = QMessageBox.question(None,'', "You are using single segmentation option which is faster but is not advised if you want multiple regions be segmented in one image. In that case click 'Send Image' button. Do you wish to continue with single segmentation?", QMessageBox.Yes | QMessageBox.No)
+            continueSingle = QMessageBox.question(None,'', "You are using single segmentation option which is faster but is not advised if you want large or multiple regions be segmented in one image. In that case click 'Send Image' button. Do you wish to continue with single segmentation?", QMessageBox.Yes | QMessageBox.No)
             if continueSingle == QMessageBox.No: return
             self.singleSegmentation(serverUrl)
 
