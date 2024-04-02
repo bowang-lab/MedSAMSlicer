@@ -33,8 +33,11 @@ You can watch a video guide for usage [here](https://youtu.be/24WtVbljr8g).
 1. From the  `Welcome to Slicer` drop-down menu, under the `Segmentation` sub-menu, `MedSAMLite` option is added. By choosing it, you get to the final steps.
 2. Load your image file.
 3. From `Prepare Data` accordion menu you can choose from preset preprocessing methods (optional, but extremely helpful)
-4. From `Select the Region of Interest` accordion menu, you can click on `Attach ROI` to select the region for segmentation.
-5. From `Start Segmentation` accordion menu, click on `Send Image` button. It will send the whole 3D image to the backend of the module for process. It will take several minutes. You will need to do this step only once for each image. As long as the image is not changed (new preprocessing / cropping / etc.) you do not have to redo this step.
-	**Note For Windows Users**. At this step, firewall might stop the backend and ask for the permission. Grant the permission. In some cases you might need to reboot your computer to update permissions. 
-6. Click on `Segmentation` button to get the segmentation results. You can replace your ROI or delete and re-attach it (step 4) as many times as you need and repeat step 6 without going over step 5 again.
-7. In the same section, from the `Segmentation` and `Source volume` drop-down menus you can choose the right segmentation group and manually refine the segmentation results. You can also assign different color to each segmentation mask.
+4. From `Select the Region of Interest` accordion menu, you can click on `Attach ROI` to select the region for segmentation. It is possible to use `Set Current Frame As Selection's Start` and `Set Current Frame As Selection's End` to set ROI boundaries on the L-R slice.
+5. In `Start Segmentation` accordion menu, you have two different ways to infer the segmentation:
+	* If you want to segment multiple regions or a single large one, it is advised to preprocess the whole image first. To do so:
+		1. click on `Send Image` button. It will send the whole 3D image to the backend of the module for process. It will take several minutes. You will need to do this step only once for each image. As long as the image is not changed (new preprocessing / cropping / etc.) you do not have to redo this step.
+		**Note For Windows Users**. At this step, firewall might stop the backend and ask for the permission. Grant the permission. In some cases you might need to reboot your computer to update permissions. 
+		2. Click on `Segmentation` button to get the segmentation results. You can replace your ROI or delete and re-attach it (step 4) as many times as you need and repeat step 5.b without going over step 5.a again.
+	* If you need to segment a single smaller region, you can bypass preprocessing and only click on `Single Segmentation`. After confirming, the segmentation would be inferred.
+6. In the same section, from the `Segmentation` and `Source volume` drop-down menus you can choose the right segmentation group and manually refine the segmentation results. You can also assign different color to each segmentation mask.

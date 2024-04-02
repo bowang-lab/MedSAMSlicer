@@ -36,7 +36,7 @@ try:
 except:
     pass # no installation anymore, shorter plugin load
 
-MEDSAMLITE_VERSION = 'v0.05'
+MEDSAMLITE_VERSION = 'v0.06'
 
 #
 # MedSAMLite
@@ -290,6 +290,8 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         
         self.ui.pbAttach.connect('clicked(bool)', lambda: self._createAndAttachROI())
         self.ui.pbTwoDim.connect('clicked(bool)', lambda: self.makeROI2D())
+        self.ui.pbLowerSelection.connect('clicked(bool)', lambda: self.setROIboundary(lower=True))
+        self.ui.pbUpperSelection.connect('clicked(bool)', lambda: self.setROIboundary(lower=False))
 
         self.model_path_widget.connect('currentPathChanged(const QString&)', lambda: setattr(self.logic, 'new_model_loaded', True))
 
@@ -338,6 +340,26 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         roiNode.SetSize(roi_size[0], roi_size[1], 1)
         roi_center = np.array(roiNode.GetCenter())
         roiNode.SetCenter([roi_center[0], roi_center[1], slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetSliceOffset()])
+    
+    def setROIboundary(self, lower):
+        roiNode = slicer.util.getNode('R')
+        
+        bounds = np.zeros(6)
+        roiNode.GetBounds(bounds)
+        p1 = bounds[::2]
+        p2 = bounds[1::2]
+
+        curr_slice = slicer.app.layoutManager().sliceWidget("Red").sliceLogic().GetSliceOffset()
+
+        center = (p2[2] + curr_slice)/2 if lower else (p1[2] + curr_slice)/2
+        depth = p2[2] - curr_slice if lower else curr_slice - p1[2]
+
+        roi_center = np.array(roiNode.GetCenter())
+        roiNode.SetCenter([roi_center[0], roi_center[1], center])
+        
+        roi_size = roiNode.GetSize()
+        roiNode.SetSize(roi_size[0], roi_size[1], depth + 1)
+
     
     def toggleLocalInstall(self, checkbox, file_selector):
         import ctk
