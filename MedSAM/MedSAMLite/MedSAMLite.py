@@ -614,14 +614,14 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
                 self.progressbar.setLabelText('Downloading updates...')
                 server_req = requests.get(server_url)
                 module_req = requests.get(module_url)
-                module_req = requests.get(ui_url)
+                ui_req = requests.get(ui_url)
 
                 with open(server_file_path, 'w') as server_file:
                     server_file.write(server_req.text)
                 with open(module_file_path, 'w') as module_file:
                     module_file.write(module_req.text)
                 with open(ui_file_path, 'w') as ui_file:
-                    ui_file.write(ui_url.text)
+                    ui_file.write(ui_req.text)
                 self.progressbar.setLabelText('Upgraded successfully, please restart Slicer.')
 
             else:
