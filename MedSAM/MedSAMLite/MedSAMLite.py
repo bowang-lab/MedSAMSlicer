@@ -531,8 +531,36 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         stopTime = time.time()
         logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
     
+    def installTorch(self, version):
+        # Install PyTorch
+        try:
+          import PyTorchUtils
+        except ModuleNotFoundError as e:
+          raise RuntimeError("This module requires PyTorch extension. Install it from the Extensions Manager.")
+
+        minTorch, minTorchVision = version.split(' ')
+        minTorch, minTorchVision = minTorch.split('==')[1], minTorchVision.split('==')[1]
+
+        torchLogic = PyTorchUtils.PyTorchUtilsLogic()
+        if not torchLogic.torchInstalled():
+            self.log('PyTorch Python package is required. Installing... (it may take several minutes)')
+            torch = torchLogic.installTorch(askConfirmation=True, torchVersionRequirement = f">={minTorch}")
+            if torch is None:
+                raise ValueError('PyTorch extension needs to be installed to use this module.')
+        else:
+            # torch is installed, check version
+            # TODO: check for vision version as well
+            from packaging import version
+            if version.parse(torchLogic.torch.__version__) < version.parse(minTorch) or version.parse(torchLogic.torchvisionVersionInformation.split(' ')[-1]) < version.parse(minTorchVision):
+                raise ValueError(f'PyTorch version {torchLogic.torch.__version__} or PyTorch Vision version {torchLogic.torchvisionVersionInformation.split(' ')[-1]} is not compatible with this module.'
+                                 + f' Minimum required version is Torch v{minTorch} and TorchVision v{minTorchVision}. You can use "PyTorch Util" module to install PyTorch'
+                                 + f' with version requirement set to: >={minTorch} and >={minTorchVision} for Torch and TorchVision respectively.')
+    
     def pip_install_wrapper(self, command, event):
-        slicer.util.pip_install(command)
+        if 'torch==' in command:
+            self.installTorch(command)
+        else:
+            slicer.util.pip_install(command)
         event.set()
     
     def download_wrapper(self, url, filename, download_needed, event):

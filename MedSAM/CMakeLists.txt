@@ -10,7 +10,7 @@ set(EXTENSION_CONTRIBUTORS "Reza Asakereh (University Health Network), Jun Ma (U
 set(EXTENSION_DESCRIPTION "3D Slicer extension for MedSAM.")
 set(EXTENSION_ICONURL "https://www.example.com/Slicer/Extensions/MedSAM.png")
 set(EXTENSION_SCREENSHOTURLS "https://www.example.com/Slicer/Extensions/MedSAM/Screenshots/1.png")
-set(EXTENSION_DEPENDS "NA") # Specified as a list or "NA" if no dependencies
+set(EXTENSION_DEPENDS "PyTorchUtils") # Specified as a list or "NA" if no dependencies
 
 #-----------------------------------------------------------------------------
 # Extension dependencies
