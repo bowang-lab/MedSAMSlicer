@@ -49,14 +49,13 @@ class MedSAMLite(ScriptedLoadableModule):
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = "MedSAMLite"  # TODO: make this more human readable by adding spaces
-        self.parent.categories = ["Segmentation"]  # TODO: set categories (folders where the module shows up in the module selector)
+        self.parent.title = "MedSAM Lite"
+        self.parent.categories = ["Segmentation"]
         self.parent.dependencies = []  # TODO: add here list of module names that this module requires
-        self.parent.contributors = ["Reza Asakereh", "Andrew Qiao", "Jun Ma"]  # TODO: replace with "Firstname Lastname (Organization)"
-        # TODO: update with short description of the module and a link to online module documentation
+        self.parent.contributors = ["Reza Asakereh (University Health Network)", "Andrew Qiao (University Health Network)", "Jun Ma (University Health Network)"]
         self.parent.helpText = """
-This is an example of scripted loadable module bundled in an extension.
-See more information in <a href="https://github.com/organization/projectname#MedSAMLite">module documentation</a>.
+This module is an implementation of the semi-automated segmentation method, MedSAM.
+See more information in <a href="https://github.com/bowang-lab/MedSAMSlicer">module github page</a>.
 """
         # TODO: replace with organization, grant and thanks
         self.parent.acknowledgementText = """
@@ -171,42 +170,31 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.logic = MedSAMLiteLogic()
         self.logic.widget = self
 
+        self.logic.server_dir = os.path.join(os.path.dirname(__file__), 'Resources/server_essentials')
+
         DEPENDENCIES_AVAILABLE = False
 
         # Initial Dependency Setup
-        if self.is_setting_available():
-            try:
-                from segment_anything.modeling import MaskDecoder
-                DEPENDENCIES_AVAILABLE = True
-            except:
-                DEPENDENCIES_AVAILABLE = False
-        else:
+        try:
+            from segment_anything.modeling import MaskDecoder
+            DEPENDENCIES_AVAILABLE = True
+        except:
             DEPENDENCIES_AVAILABLE = False
-
+        
         if not DEPENDENCIES_AVAILABLE:
             from PythonQt.QtGui import QLabel, QPushButton, QSpacerItem, QSizePolicy, QCheckBox
             import ctk
-            path_instruction = QLabel('Choose a folder to install module dependencies in')
+            install_instruction = QLabel('This package requires some dependencies to be installed prior to use.')
             restart_instruction = QLabel('Restart 3D Slicer after all dependencies are installed!')
 
-            ctk_install_path = ctk.ctkPathLineEdit()
-            ctk_install_path.filters = ctk.ctkPathLineEdit.Dirs
-            
-            local_install = QCheckBox("Install from local server_essentials.zip")
-            local_install.toggled.connect(lambda:self.toggleLocalInstall(local_install, ctk_install_path))
-
             install_btn = QPushButton('Install dependencies')
-            install_btn.clicked.connect(lambda: self.logic.install_dependencies(ctk_install_path))
+            install_btn.clicked.connect(self.logic.install_dependencies)
 
-            self.layout.addWidget(path_instruction)
-            self.layout.addWidget(local_install)
-            self.layout.addWidget(ctk_install_path)
+            self.layout.addWidget(install_instruction)
             self.layout.addWidget(install_btn)
             self.layout.addWidget(restart_instruction)
             
             return
-        
-        self.logic.server_dir = os.path.join(self.read_setting(), 'server_essentials')
 
         # Load widget from .ui file (created by Qt Designer).
         # Additional widgets can be instantiated manually and added to self.layout.
@@ -216,26 +204,7 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         ############################################################################
         # Model Selection
-        if hasattr(self.ui, 'ctkPathModel'):
-            self.model_path_widget = self.ui.ctkPathModel
-            # self.ui.clbtnOperation.layout().addWidget(self.ui.lblModelSelection, 0, 0)
-            # self.ui.clbtnOperation.layout().addWidget(self.ui.ctkPathModel, 0, 1)
-        else:
-            import ctk
-            from PythonQt.QtGui import QLabel
-
-            path_instruction = QLabel('MedSAM Model:')
-
-            self.model_path_widget = ctk.ctkPathLineEdit()
-            self.model_path_widget.filters = ctk.ctkPathLineEdit.Files
-            self.model_path_widget.nameFilters = ['*.pth']
-
-            self.ui.clbtnOperation.layout().addWidget(path_instruction, 0, 0)
-            self.ui.clbtnOperation.layout().addWidget(self.model_path_widget, 0, 1)
-            
-            self.ui.clbtnOperation.layout().addWidget(self.ui.pbSendImage, 1, 0)
-            self.ui.clbtnOperation.layout().addWidget(self.ui.pbSegment, 1, 1)
-        
+        self.model_path_widget = self.ui.ctkPathModel
         self.model_path_widget.currentPath = os.path.join(self.logic.server_dir, 'medsam_lite.pth')
         self.logic.new_model_loaded = True
         ############################################################################
@@ -248,10 +217,7 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.editor.setMaximumNumberOfUndoStates(10)
         self.selectParameterNode()
         self.editor.setMRMLScene(slicer.mrmlScene)
-        # print(self.ui.clbtnOperation.layout().__dict__)
         self.ui.clbtnOperation.layout().addWidget(self.editor, 3, 0, 1, 2)
-        # self.layout.addWidget(self.editor)
-        # self.editor.currentSegmentIDChanged.connect(print)
         ############################################################################
 
         ###########################################################################
@@ -283,9 +249,10 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.pbSendImage.connect('clicked(bool)', lambda: self.logic.sendImage(partial=False))
         self.ui.pbSegment.connect('clicked(bool)', lambda: self.logic.applySegmentation())
 
-        self.ui.pbCTprep.setIcon(QIcon(os.path.join(self.logic.server_dir, 'CT.jpg')))
+        iconsPath = os.path.join(os.path.dirname(__file__), 'Resources/Icons')
+        self.ui.pbCTprep.setIcon(QIcon(os.path.join(iconsPath, 'CT.jpg')))
         self.ui.pbCTprep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.logic.preprocess_CT))
-        self.ui.pbMRprep.setIcon(QIcon(os.path.join(self.logic.server_dir, 'MR.png')))
+        self.ui.pbMRprep.setIcon(QIcon(os.path.join(iconsPath, 'MR.png')))
         self.ui.pbMRprep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.logic.preprocess_MR))
         
         self.ui.pbAttach.connect('clicked(bool)', lambda: self._createAndAttachROI())
@@ -436,29 +403,7 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             # Note: in the .ui file, a Qt dynamic property called "SlicerParameterName" is set on each
             # ui element that needs connection.
             self._parameterNodeGuiTag = self._parameterNode.connectGui(self.ui)
-        
-    def is_setting_available(self):
-        if not (os.path.isfile('.medsam_info') or os.path.isfile(os.path.expanduser('~/.medsam_info'))):
-            return False
-
-        setting_file = '.medsam_info' if os.path.isfile('.medsam_info') else os.path.expanduser('~/.medsam_info')
-        server_file = os.path.join(self.read_setting(), 'server_essentials/server.py')
-
-        return os.path.isfile(server_file)
-    
-    def read_setting(self):
-        setting_file = '.medsam_info' if os.path.isfile('.medsam_info') else os.path.expanduser('~/.medsam_info')
-        with open(setting_file, 'r') as settings:
-            server_essentials_root = settings.read()
-            return server_essentials_root
-
-    def write_setting(self, setting):
-        try:
-            with open('.medsam_info', 'w') as settings:
-                settings.write(setting)
-        except:
-            with open(os.path.expanduser('~/.medsam_info'), 'w') as settings:
-                settings.write(setting)
+            
 
 
 #
@@ -549,7 +494,6 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
                 raise ValueError('PyTorch extension needs to be installed to use this module.')
         else:
             # torch is installed, check version
-            # TODO: check for vision version as well
             from packaging import version
             if version.parse(torchLogic.torch.__version__) < version.parse(minTorch) or version.parse(torchLogic.torchvisionVersionInformation.split(' ')[-1]) < version.parse(minTorchVision):
                 raise ValueError(f'PyTorch version {torchLogic.torch.__version__} or PyTorch Vision version {torchLogic.torchvisionVersionInformation.split(' ')[-1]} is not compatible with this module.'
@@ -566,7 +510,6 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
     def download_wrapper(self, url, filename, download_needed, event):
         if download_needed:
             with urlopen(url) as r:
-                # self.setTotalProgress.emit(int(r.info()["Content-Length"]))
                 with open(filename, "wb") as f:
                     while True:
                         chunk = r.read(1024)
@@ -581,32 +524,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         
         event.set()
     
-    def install_dependencies(self, ctk_path):
-        if ctk_path.currentPath == '':
-            print('Installation path is empty')
-            return
-        
-        if os.path.isfile(ctk_path.currentPath) and os.path.basename(ctk_path.currentPath) == 'server_essentials.zip':
-            install_path = os.path.abspath(os.path.dirname(ctk_path.currentPath))
-            download_needed = False
-        elif os.path.isdir(ctk_path.currentPath):
-            install_path = ctk_path.currentPath
-            download_needed = True
-        else:
-            print('Invalid installation path')
-            return
-        
-        print('Installation will happen in %s'%install_path)
-        
-        self.widget.write_setting(install_path)
-
-        file_url = 'https://github.com/rasakereh/medsam-3dslicer/raw/master/server_essentials.zip'
-        filename = os.path.join(install_path, 'server_essentials.zip')
-        
-        self.run_on_background(self.download_wrapper, (file_url, filename, download_needed), 'Downloading additional files...')
-
-        self.server_dir = os.path.join(install_path + '/', 'server_essentials')
-
+    def install_dependencies(self):
         dependencies = {
             'PyTorch': 'torch==2.0.1 torchvision==0.15.2',
             'Numpy Socket': 'numpysocket',
@@ -731,7 +649,6 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
                     p_sec += 1
             if p_sec >= timeout_sec:
                 self.server_process.kill()
-        # atexit.register(cleanup)
 
         self.run_on_background(self.check_server, (serverUrl, 10), 'Backend is loading...')
 
@@ -740,7 +657,6 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         response = requests.post(f'{serverUrl}/getProgress')
         progress_data = json.loads(response.json())
         self.progressbar.value = progress_data['generated_embeds']
-        # slicer.app.processEvents()
 
         if int(progress_data['layers']) == int(progress_data['generated_embeds']):
             self.progressbar.close()
@@ -754,7 +670,6 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
                 self.widget.ui.pbSegment.setText('Segmentation')
 
     def volumeChanged(self, node=None):
-        # self.widget.ui.pbSegment.setEnabled(False)
         self.widget.ui.pbSegment.setText('Single Segmentation')
 
 
@@ -773,10 +688,6 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         
         ############ Partial segmentation
         if partial:
-            ################ DEBUG MODE ################
-            if self.volume_node is None:
-                self.captureImage()
-            ################ DEBUG MODE ################
             _, _, zrange = self.get_bounding_box()
             zmin, zmax = zrange
         else:
@@ -789,7 +700,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         self.captureImage()
         with NumpySocket() as s:
             s.connect(numpyServerAddress)
-            print("sending numpy array:")
+            print("Sending numpy array...")
             s.sendall(self.image_data)
         
         ###########################
@@ -900,9 +811,6 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
     
     def preprocess_CT(self, win_level=40.0, win_width=400.0):
         self.captureImage()
-        # self.volume_node.GetDisplayNode().SetThreshold(0, 255)
-        # self.volume_node.GetDisplayNode().ApplyThresholdOn()
-        
         lower_bound, upper_bound = win_level - win_width/2, win_level + win_width/2
         image_data_pre = np.clip(self.image_data, lower_bound, upper_bound)
         image_data_pre = (image_data_pre - np.min(image_data_pre))/(np.max(image_data_pre)-np.min(image_data_pre))*255.0
