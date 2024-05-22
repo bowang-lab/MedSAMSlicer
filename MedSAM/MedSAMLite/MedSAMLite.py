@@ -31,12 +31,11 @@ from PythonQt.QtCore import QTimer, QByteArray
 from PythonQt.QtGui import QIcon, QPixmap, QMessageBox
 
 try:
-    from numpysocket import NumpySocket
-    import psutil
+    import MedSAM_Interface from medsam_inference # FIXME
 except:
     pass # no installation anymore, shorter plugin load
 
-MEDSAMLITE_VERSION = 'v0.06'
+MEDSAMLITE_VERSION = 'v0.1'
 
 #
 # MedSAMLite
@@ -429,12 +428,14 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
     server_dir = None
     widget = None
     new_model_loaded = True
+    backend = None
 
     def __init__(self) -> None:
         """
         Called when the logic class is instantiated. Can be used for initializing member variables.
         """
         ScriptedLoadableModuleLogic.__init__(self)
+        self.backend = MedSAM_Interface()
 
     def getParameterNode(self):
         return MedSAMLiteParameterNode(super().getParameterNode())
@@ -527,9 +528,6 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
     def install_dependencies(self):
         dependencies = {
             'PyTorch': 'torch==2.0.1 torchvision==0.15.2',
-            'Numpy Socket': 'numpysocket',
-            'FastAPI': 'fastapi',
-            'Uvicorn': 'uvicorn',
             'MedSam Lite Server': '-e "%s"'%(self.server_dir)
         }
 
@@ -577,30 +575,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         
         time.sleep(3)
 
-        event.set()
-    
-    def check_server(self, serverUrl, max_retries, event = None):
-        retry_cnt = 0
-        while True:
-            try:
-                retry_cnt += 1
-                response = requests.post(f'{serverUrl}/getServerState')
-                server_ready = json.loads(response.json())
-                if server_ready['ready']:
-                    if event:
-                        event.set()
-                    return True
-                elif retry_cnt == max_retries:
-                    if event:
-                        event.set()
-                    return False
-            except Exception as e:
-                if retry_cnt == max_retries:
-                    if event:
-                        event.set()
-                    return False
-            time.sleep(1)
-        
+        event.set()        
     
     
     def run_on_background(self, target, args, title):
@@ -618,47 +593,17 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
 
         self.progressbar.close()
     
-    def run_server(self, serverUrl, numpyServerAddress):
-        print('Terminating possible server duplicates...')
-        # Terminate image transferrer
-        try:
-            with NumpySocket() as s:
-                s.connect(numpyServerAddress)
-                s.sendall(np.array([]))
-        except:
-            pass
-
-        # Terminate whole server
-        server_port = int(serverUrl.split(':')[-1])
-        try:
-            server_process = list(filter(lambda proc: proc.laddr.port == server_port and 'python-real' in psutil.Process(proc.pid).name(), psutil.net_connections()))[0]
-            psutil.Process(server_process.pid).terminate()
-        except:
-            pass
-
-        print('Running server...')
-
-        self.server_process = subprocess.Popen(['PythonSlicer', os.path.join(self.server_dir, 'server.py'), self.widget.model_path_widget.currentPath])#, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, start_new_session=True)
-        def cleanup():
-            timeout_sec = 5
-
-            p_sec = 0
-            for second in range(timeout_sec):
-                if self.server_process.poll() == None:
-                    time.sleep(1)
-                    p_sec += 1
-            if p_sec >= timeout_sec:
-                self.server_process.kill()
-
-        self.run_on_background(self.check_server, (serverUrl, 10), 'Backend is loading...')
-
+    def run_server(self, numpyServerAddress):
+        #FIXME show that 'Backend is loading...'
+        self.backend.MedSAM_CKPT_PATH = self.widget.model_path_widget.currentPath
+        self.backend.build_medsam_lite()
+        self.server_ready = True
     
-    def progressCheck(self, partial=False, serverUrl='http://127.0.0.1:5555'):
-        response = requests.post(f'{serverUrl}/getProgress')
-        progress_data = json.loads(response.json())
+    def progressCheck(self, partial=False):
+        progress_data = self.backend.get_progress()
         self.progressbar.value = progress_data['generated_embeds']
 
-        if int(progress_data['layers']) == int(progress_data['generated_embeds']):
+        if progress_data['layers'] == progress_data['generated_embeds']:
             self.progressbar.close()
             self.timer.stop()
             self.widget.ui.pbSegment.setEnabled(True)
@@ -678,11 +623,11 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         self.volume_node = slicer.util.getNodesByClass('vtkMRMLScalarVolumeNode')[0]
         self.image_data = slicer.util.arrayFromVolume(self.volume_node)  ################ Only one node?
     
-    def sendImage(self, partial=False, serverUrl='http://127.0.0.1:5555', numpyServerAddress=("127.0.0.1", 5556)):
+    def sendImage(self, partial=False):
         self.widget.ui.pbSegment.setEnabled(False)
         self.widget.ui.pbSegment.setText('Sending image, please wait...')
 
-        if self.new_model_loaded or not self.check_server(serverUrl, max_retries=1, event=None):
+        if self.new_model_loaded or not self.server_ready:
             self.run_server(serverUrl, numpyServerAddress)
             self.new_model_loaded = False
         
@@ -693,16 +638,9 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         else:
             zmin, zmax = -1, -1
 
-        print('sending setImage request...')
-        response = requests.post(f'{serverUrl}/setImage', json={"wmin": -160, "wmax": 240, "zmin": zmin, "zmax": zmax}) # wmin, wmax as input?
-        print('Response from setImage:', response.text)
-
         self.captureImage()
-        with NumpySocket() as s:
-            s.connect(numpyServerAddress)
-            print("Sending numpy array...")
-            s.sendall(self.image_data)
-        
+        response = self.backend.set_image(arr=self.image_data, wmin=-160, wmax=240, zmin=zmin, zmax=zmax) # wmin, wmax as input? #FIXME do it in the background
+
         ###########################
         # Timer
         self.timer = QTimer()
@@ -715,7 +653,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
 
         self.timer.start(1000)
     
-    def inferSegmentation(self, serverUrl='http://127.0.0.1:5555'):
+    def inferSegmentation(self):
         print('sending infer request...')
         ################ DEBUG MODE ################
         if self.volume_node is None:
@@ -723,10 +661,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         ################ DEBUG MODE ################
 
         slice_idx, bbox, zrange = self.get_bounding_box()
-
-        response = requests.post(f'{serverUrl}/infer', json={"slice_idx": slice_idx, "bbox": bbox, "zrange": zrange})
-        response.raise_for_status()
-        seg_data = json.loads(response.json())
+        seg_data = self.backend.infer(slice_idx, bbox, zrange)
         frames = sorted(list(map(int, seg_data.keys())))
         seg_result = np.zeros_like(self.image_data)
         for frame in frames:
@@ -763,14 +698,14 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         self.sendImage(partial=True, serverUrl=serverUrl)
 
     
-    def applySegmentation(self, serverUrl='http://127.0.0.1:5555'):
+    def applySegmentation(self):
         if self.widget.ui.pbSegment.text == 'Single Segmentation':
             continueSingle = QMessageBox.question(None,'', "You are using single segmentation option which is faster but is not advised if you want large or multiple regions be segmented in one image. In that case click 'Send Image' button. Do you wish to continue with single segmentation?", QMessageBox.Yes | QMessageBox.No)
             if continueSingle == QMessageBox.No: return
-            self.singleSegmentation(serverUrl)
+            self.singleSegmentation()
 
             return
-        segmentation_mask = self.inferSegmentation(serverUrl)
+        segmentation_mask = self.inferSegmentation()
         self.showSegmentation(segmentation_mask)
     
     def get_bounding_box(self):
