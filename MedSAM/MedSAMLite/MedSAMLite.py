@@ -16,6 +16,7 @@ import threading
 import zipfile
 
 import slicer
+from slicer import vtkMRMLMarkupsROINode, vtkMRMLSegmentationNode
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
 from slicer.parameterNodeWrapper import (
@@ -31,7 +32,7 @@ from PythonQt.QtCore import QTimer, QByteArray
 from PythonQt.QtGui import QIcon, QPixmap, QMessageBox
 
 try:
-    import MedSAM_Interface from medsam_inference # FIXME
+    from medsam_interface import MedSAM_Interface # FIXME
 except:
     pass # no installation anymore, shorter plugin load
 
@@ -122,20 +123,10 @@ def registerSampleData():
 
 @parameterNodeWrapper
 class MedSAMLiteParameterNode:
-    """
-    The parameters needed by module.
-
-    inputVolume - The volume to threshold.
-    imageThreshold - The value at which to threshold the input volume.
-    invertThreshold - If true, will invert the threshold.
-    thresholdedVolume - The output volume that will contain the thresholded volume.
-    invertedVolume - The output volume that will contain the inverted thresholded volume.
-    """
-    inputVolume: vtkMRMLScalarVolumeNode
-    imageThreshold: Annotated[float, WithinRange(-100, 500)] = 100
-    invertThreshold: bool = False
-    thresholdedVolume: vtkMRMLScalarVolumeNode
-    invertedVolume: vtkMRMLScalarVolumeNode
+    roiNode: vtkMRMLMarkupsROINode = None
+    segmentationNode: vtkMRMLSegmentationNode = None
+    embeddings: list[list[list[float]]] = None
+    modelPath: str = None
 
 
 #
@@ -383,7 +374,6 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self.setParameterNode(self.logic.getParameterNode())
 
-        # Select default input nodes if nothing is selected yet to save a few clicks for the user
         if not self._parameterNode.inputVolume:
             firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLScalarVolumeNode")
             if firstVolumeNode:
@@ -394,6 +384,14 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         Set and observe parameter node.
         Observation is needed because when the parameter node is changed then the GUI must be updated immediately.
         """
+
+        print('=================================')
+        print(inputParameterNode)
+        print('roiNode:', inputParameterNode.roiNode)
+        print('segmentationNode:', inputParameterNode.segmentationNode)
+        print('embeddings:', inputParameterNode.embeddings)
+        print('modelPath:', inputParameterNode.modelPath)
+        print('=================================')
 
         if self._parameterNode:
             self._parameterNode.disconnectGui(self._parameterNodeGuiTag)
@@ -435,7 +433,6 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         Called when the logic class is instantiated. Can be used for initializing member variables.
         """
         ScriptedLoadableModuleLogic.__init__(self)
-        self.backend = MedSAM_Interface()
 
     def getParameterNode(self):
         return MedSAMLiteParameterNode(super().getParameterNode())
@@ -489,23 +486,20 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
 
         torchLogic = PyTorchUtils.PyTorchUtilsLogic()
         if not torchLogic.torchInstalled():
-            self.log('PyTorch Python package is required. Installing... (it may take several minutes)')
-            torch = torchLogic.installTorch(askConfirmation=True, torchVersionRequirement = f">={minTorch}")
+            print('PyTorch Python package is required. Installing... (it may take several minutes)')
+            torch = torchLogic.installTorch(askConfirmation=True, torchVersionRequirement = f">={minTorch}", torchvisionVersionRequirement=f">={minTorchVision}")
             if torch is None:
                 raise ValueError('PyTorch extension needs to be installed to use this module.')
         else:
             # torch is installed, check version
             from packaging import version
             if version.parse(torchLogic.torch.__version__) < version.parse(minTorch) or version.parse(torchLogic.torchvisionVersionInformation.split(' ')[-1]) < version.parse(minTorchVision):
-                raise ValueError(f'PyTorch version {torchLogic.torch.__version__} or PyTorch Vision version {torchLogic.torchvisionVersionInformation.split(' ')[-1]} is not compatible with this module.'
+                raise ValueError(f'PyTorch version {torchLogic.torch.__version__} or PyTorch Vision version {torchLogic.torchvisionVersionInformation.split(" ")[-1]} is not compatible with this module.'
                                  + f' Minimum required version is Torch v{minTorch} and TorchVision v{minTorchVision}. You can use "PyTorch Util" module to install PyTorch'
                                  + f' with version requirement set to: >={minTorch} and >={minTorchVision} for Torch and TorchVision respectively.')
     
     def pip_install_wrapper(self, command, event):
-        if 'torch==' in command:
-            self.installTorch(command)
-        else:
-            slicer.util.pip_install(command)
+        slicer.util.pip_install(command)
         event.set()
     
     def download_wrapper(self, url, filename, download_needed, event):
@@ -532,7 +526,10 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         }
 
         for dependency in dependencies:
-            self.run_on_background(self.pip_install_wrapper, (dependencies[dependency],), 'Installing dependencies: %s'%dependency)
+            if 'torch==' in dependencies[dependency]:
+                self.installTorch(dependencies[dependency])
+            else:
+                self.run_on_background(self.pip_install_wrapper, (dependencies[dependency],), 'Installing dependencies: %s'%dependency)
     
 
     def upgrade(self, download, event):
@@ -578,28 +575,35 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         event.set()        
     
     
-    def run_on_background(self, target, args, title):
+    def run_on_background(self, target, args, title, progress_check=None):
         self.progressbar = slicer.util.createProgressDialog(autoClose=False)
         self.progressbar.minimum = 0
-        self.progressbar.maximum = 0
+        self.progressbar.maximum = 0 if progress_check is None else 100
         self.progressbar.setLabelText(title)
+
+        if progress_check is not None:
+            self.timer = QTimer()
+            self.timer.timeout.connect(progress_check)
+            self.timer.start(1000)
         
-        pip_install_event = threading.Event()
-        dep_thread = threading.Thread(target=target, args=(*args, pip_install_event,))
+        parallel_event = threading.Event()
+        dep_thread = threading.Thread(target=target, args=(*args, parallel_event,))
         dep_thread.start()
-        while not pip_install_event.is_set():
+        while not parallel_event.is_set():
             slicer.app.processEvents()
         dep_thread.join()
 
         self.progressbar.close()
     
-    def run_server(self, numpyServerAddress):
+    def run_server(self):
         #FIXME show that 'Backend is loading...'
+        self.backend = MedSAM_Interface()
         self.backend.MedSAM_CKPT_PATH = self.widget.model_path_widget.currentPath
-        self.backend.build_medsam_lite()
+        self.backend.load_model()
         self.server_ready = True
     
     def progressCheck(self, partial=False):
+        slicer.app.processEvents()
         progress_data = self.backend.get_progress()
         self.progressbar.value = progress_data['generated_embeds']
 
@@ -608,7 +612,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
             self.timer.stop()
             self.widget.ui.pbSegment.setEnabled(True)
             if partial:
-                segmentation_mask = self.inferSegmentation(serverUrl)
+                segmentation_mask = self.inferSegmentation()
                 self.showSegmentation(segmentation_mask)
                 self.widget.ui.pbSegment.setText('Single Segmentation')
             else:
@@ -628,7 +632,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         self.widget.ui.pbSegment.setText('Sending image, please wait...')
 
         if self.new_model_loaded or not self.server_ready:
-            self.run_server(serverUrl, numpyServerAddress)
+            self.run_server()
             self.new_model_loaded = False
         
         ############ Partial segmentation
@@ -639,19 +643,24 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
             zmin, zmax = -1, -1
 
         self.captureImage()
-        response = self.backend.set_image(arr=self.image_data, wmin=-160, wmax=240, zmin=zmin, zmax=zmax) # wmin, wmax as input? #FIXME do it in the background
-
-        ###########################
-        # Timer
-        self.timer = QTimer()
-        self.timer.timeout.connect(lambda: self.progressCheck(partial))
-        ###########################
+        
         self.progressbar = slicer.util.createProgressDialog(autoClose=False)
         self.progressbar.minimum = 0
-        self.progressbar.maximum = self.image_data.shape[0]
-        self.progressbar.setLabelText('Preparing image embeddings...')
+        self.progressbar.maximum = 100
+        self.progressbar.setLabelText("Wait for the embeddings")
 
+        self.timer = QTimer()
+        self.timer.timeout.connect(lambda: self.progressCheck(partial))
         self.timer.start(1000)
+
+        self.backend.set_image(self.image_data, -160, 240, zmin, zmax, recurrent_func=slicer.app.processEvents)
+        # self.run_on_background(self.embedding_prep_wrapper, (self.image_data, -160, 240, zmin, zmax), "Preparing image embeddings...", lambda: self.progressCheck(partial))
+    
+    def embedding_prep_wrapper(self, arr, wmin, wmax, zmin, zmax, event):
+        print('before sending image')
+        self.backend.set_image(arr, wmin, wmax, zmin, zmax)
+        print('after sending image')
+        event.set()
     
     def inferSegmentation(self):
         print('sending infer request...')
@@ -662,10 +671,11 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
 
         slice_idx, bbox, zrange = self.get_bounding_box()
         seg_data = self.backend.infer(slice_idx, bbox, zrange)
-        frames = sorted(list(map(int, seg_data.keys())))
+        frames = list(seg_data.keys())
         seg_result = np.zeros_like(self.image_data)
+        print('keys:', frames, 'result:', seg_result.shape)
         for frame in frames:
-            seg_result[frame, :, :] = seg_data[str(frame)]
+            seg_result[frame, :, :] = seg_data[frame]
 
         return seg_result
     
@@ -694,8 +704,8 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
 
         slicer.mrmlScene.RemoveNode(segment_volume)
     
-    def singleSegmentation(self, serverUrl):
-        self.sendImage(partial=True, serverUrl=serverUrl)
+    def singleSegmentation(self):
+        self.sendImage(partial=True)
 
     
     def applySegmentation(self):
