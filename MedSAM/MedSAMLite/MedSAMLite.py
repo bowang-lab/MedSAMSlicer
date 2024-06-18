@@ -239,11 +239,10 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.pbSendImage.connect('clicked(bool)', lambda: self.logic.sendImage(partial=False))
         self.ui.pbSegment.connect('clicked(bool)', lambda: self.logic.applySegmentation())
 
-        iconsPath = os.path.join(os.path.dirname(__file__), 'Resources/Icons')
-        self.ui.pbCTprep.setIcon(QIcon(os.path.join(iconsPath, 'CT.jpg')))
-        self.ui.pbCTprep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.logic.preprocess_CT))
-        self.ui.pbMRprep.setIcon(QIcon(os.path.join(iconsPath, 'MR.png')))
-        self.ui.pbMRprep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.logic.preprocess_MR))
+        # Preprocessing
+        self.ui.cmbPrepOptions.addItems(['Manual', 'Abdominal CT', 'Lung CT', 'Brain CT', 'Mediastinum CT', 'MR'])
+        self.ui.cmbPrepOptions.currentTextChanged.connect(lambda new_text: self.setManualPreprocessVis(new_text == 'Manual'))
+        self.ui.pbApplyPrep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.ui.cmbPrepOptions.currentText, self.ui.sldWinLevel.value, self.ui.sldWinWidth.value))
         
         self.ui.pbAttach.connect('clicked(bool)', lambda: self._createAndAttachROI())
         self.ui.pbTwoDim.connect('clicked(bool)', lambda: self.makeROI2D())
@@ -254,6 +253,12 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
+    
+    def setManualPreprocessVis(self, visible):
+        self.ui.lblLevel.setVisible(visible)
+        self.ui.lblWidth.setVisible(visible)
+        self.ui.sldWinLevel.setVisible(visible)
+        self.ui.sldWinWidth.setVisible(visible)
     
 
     def selectParameterNode(self):
@@ -385,13 +390,13 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         Observation is needed because when the parameter node is changed then the GUI must be updated immediately.
         """
 
-        print('=================================')
-        print(inputParameterNode)
-        print('roiNode:', inputParameterNode.roiNode)
-        print('segmentationNode:', inputParameterNode.segmentationNode)
-        print('embeddings:', inputParameterNode.embeddings)
-        print('modelPath:', inputParameterNode.modelPath)
-        print('=================================')
+        # print('=================================')
+        # print(inputParameterNode)
+        # print('roiNode:', inputParameterNode.roiNode)
+        # print('segmentationNode:', inputParameterNode.segmentationNode)
+        # print('embeddings:', inputParameterNode.embeddings)
+        # print('modelPath:', inputParameterNode.modelPath)
+        # print('=================================')
 
         if self._parameterNode:
             self._parameterNode.disconnectGui(self._parameterNodeGuiTag)
@@ -435,6 +440,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         ScriptedLoadableModuleLogic.__init__(self)
 
     def getParameterNode(self):
+        print(super().getParameterNode())
         return MedSAMLiteParameterNode(super().getParameterNode())
 
     def process(self,
@@ -783,8 +789,22 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         self.image_data[:,:,:] = new_image
         slicer.util.arrayFromVolumeModified(self.volume_node)
     
-    def applyPreprocess(self, method):
-        self.updateImage(method())
+    def applyPreprocess(self, method, win_level, win_width):
+        if method == 'MR':
+            prep_img = self.preprocess_MR()
+        elif method == 'Manual':
+            prep_img = self.preprocess_CT(win_level = win_level, win_width = win_width)
+        else:
+            conversion = {
+                'Abdominal CT': (400.0, 40.0),
+                'Lung CT': (1500.0, -600.0),
+                'Brain CT': (80.0, 40.0),
+                'Mediastinum CT': (350.0, 50.0),
+            }
+            ww, wl = conversion[method]
+            prep_img = self.preprocess_CT(win_level = wl, win_width = ww)
+
+        self.updateImage(prep_img)
 
 
 #

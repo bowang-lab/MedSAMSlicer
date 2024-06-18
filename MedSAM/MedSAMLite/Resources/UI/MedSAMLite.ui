@@ -24,42 +24,60 @@
       <string>Prepare Data</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_2">
-      <item row="0" column="1">
-       <widget class="QPushButton" name="pbCTprep">
-        <property name="toolTip">
-         <string>Preprocess for CT Images</string>
+      <item row="2" column="0">
+       <widget class="ctkSliderWidget" name="sldWinLevel">
+        <property name="decimals">
+         <number>1</number>
         </property>
-        <property name="text">
-         <string/>
+        <property name="minimum">
+         <double>-2000.000000000000000</double>
         </property>
-        <property name="iconSize">
-         <size>
-          <width>150</width>
-          <height>150</height>
-         </size>
+        <property name="maximum">
+         <double>2000.000000000000000</double>
         </property>
        </widget>
       </item>
-      <item row="0" column="2">
-       <widget class="QPushButton" name="pbMRprep">
-        <property name="toolTip">
-         <string>Preprocess for MR Images</string>
+      <item row="2" column="1">
+       <widget class="ctkSliderWidget" name="sldWinWidth">
+        <property name="decimals">
+         <number>1</number>
         </property>
+        <property name="maximum">
+         <double>2000.000000000000000</double>
+        </property>
+        <property name="value">
+         <double>50.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="cmbPrepOptions"/>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="lblLevel">
         <property name="text">
-         <string/>
+         <string>Window Level:</string>
         </property>
-        <property name="iconSize">
-         <size>
-          <width>150</width>
-          <height>150</height>
-         </size>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLabel" name="lblWidth">
+        <property name="text">
+         <string>Window Width:</string>
         </property>
        </widget>
       </item>
       <item row="0" column="0">
-       <widget class="QLabel" name="lblPrep">
+       <widget class="QLabel" name="lblPrepOption">
         <property name="text">
          <string>Preprocessing Options:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0" colspan="2">
+       <widget class="QPushButton" name="pbApplyPrep">
+        <property name="text">
+         <string>Apply</string>
         </property>
        </widget>
       </item>
@@ -161,6 +179,11 @@
    <class>ctkPathLineEdit</class>
    <extends>QWidget</extends>
    <header>ctkPathLineEdit.h</header>
+  </customwidget>
+  <customwidget>
+   <class>ctkSliderWidget</class>
+   <extends>QWidget</extends>
+   <header>ctkSliderWidget.h</header>
   </customwidget>
   <customwidget>
    <class>qMRMLWidget</class>
