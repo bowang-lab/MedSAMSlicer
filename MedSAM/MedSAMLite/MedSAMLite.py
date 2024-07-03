@@ -123,10 +123,12 @@ def registerSampleData():
 
 @parameterNodeWrapper
 class MedSAMLiteParameterNode:
-    roiNode: vtkMRMLMarkupsROINode = None
-    segmentationNode: vtkMRMLSegmentationNode = None
-    embeddings: list[list[list[float]]] = None
-    modelPath: str = None
+    roiNode: vtkMRMLMarkupsROINode
+    segmentationNode: vtkMRMLSegmentationNode
+    modelPath: str
+    prepMethod: str
+    prepWinLevel: float = 40.0
+    prepWinWidth: float = 400.0
 
 
 #
@@ -243,6 +245,12 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.cmbPrepOptions.addItems(['Manual', 'Abdominal CT', 'Lung CT', 'Brain CT', 'Mediastinum CT', 'MR'])
         self.ui.cmbPrepOptions.currentTextChanged.connect(lambda new_text: self.setManualPreprocessVis(new_text == 'Manual'))
         self.ui.pbApplyPrep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.ui.cmbPrepOptions.currentText, self.ui.sldWinLevel.value, self.ui.sldWinWidth.value))
+
+        # Hide unnecessary ROI controls
+        self.ui.widgetROI.findChild("QLabel", "label").hide()
+        self.ui.widgetROI.findChild("QCheckBox", "insideOutCheckBox").hide()
+        self.ui.widgetROI.findChild("QLabel", "label_10").hide()
+        self.ui.widgetROI.findChild("QComboBox", "roiTypeComboBox").hide()
         
         self.ui.pbAttach.connect('clicked(bool)', lambda: self._createAndAttachROI())
         self.ui.pbTwoDim.connect('clicked(bool)', lambda: self.makeROI2D())
@@ -293,7 +301,18 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         slicer.modules.cropvolume.logic().FitROIToInputVolume(cropVolumeParameters)
         slicer.mrmlScene.RemoveNode(cropVolumeParameters)
 
+        self.scaleROI(.85)
+
         self.ui.widgetROI.setMRMLMarkupsNode(slicer.util.getNode("R"))
+        self.updateAllParameters()
+
+
+    
+    def scaleROI(self, ratio):
+        # Make sure there is exactly one 'R'
+        roiNode = slicer.util.getNode('R')
+        roi_size = roiNode.GetSize()
+        roiNode.SetSize(int(roi_size[0] * ratio), int(roi_size[1] * ratio), int(roi_size[2] * ratio))
     
     def makeROI2D(self):
         # Make sure there is exactly one 'R'
@@ -379,24 +398,11 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self.setParameterNode(self.logic.getParameterNode())
 
-        if not self._parameterNode.inputVolume:
-            firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLScalarVolumeNode")
-            if firstVolumeNode:
-                self._parameterNode.inputVolume = firstVolumeNode
-
     def setParameterNode(self, inputParameterNode: Optional[MedSAMLiteParameterNode]) -> None:
         """
         Set and observe parameter node.
         Observation is needed because when the parameter node is changed then the GUI must be updated immediately.
         """
-
-        # print('=================================')
-        # print(inputParameterNode)
-        # print('roiNode:', inputParameterNode.roiNode)
-        # print('segmentationNode:', inputParameterNode.segmentationNode)
-        # print('embeddings:', inputParameterNode.embeddings)
-        # print('modelPath:', inputParameterNode.modelPath)
-        # print('=================================')
 
         if self._parameterNode:
             self._parameterNode.disconnectGui(self._parameterNodeGuiTag)
@@ -405,6 +411,36 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             # Note: in the .ui file, a Qt dynamic property called "SlicerParameterName" is set on each
             # ui element that needs connection.
             self._parameterNodeGuiTag = self._parameterNode.connectGui(self.ui)
+            self.renderAllParameters()
+    
+    
+    def renderAllParameters(self):
+        if self._parameterNode.modelPath:
+            self.model_path_widget.currentPath = self._parameterNode.modelPath
+        if self._parameterNode.roiNode:
+            self.ui.widgetROI.setMRMLMarkupsNode(slicer.util.getNode("R"))
+        if self._parameterNode.segmentationNode:
+            self.logic.segment_res_group = self._parameterNode.segmentationNode
+        
+
+        if self._parameterNode.prepMethod:
+            self.ui.cmbPrepOptions.currentText = self._parameterNode.prepMethod
+        if self._parameterNode.prepWinLevel:
+            self.ui.sldWinLevel.value = self._parameterNode.prepWinLevel
+        if self._parameterNode.prepWinWidth:
+            self.ui.sldWinWidth.value = self._parameterNode.prepWinWidth
+    
+
+    def updateAllParameters(self):
+        self._parameterNode.modelPath = self.model_path_widget.currentPath
+        try:
+            self._parameterNode.roiNode = slicer.util.getNode('R')
+        except:
+            pass
+        self._parameterNode.segmentationNode = self.logic.segment_res_group
+        self._parameterNode.prepMethod = self.ui.cmbPrepOptions.currentText
+        self._parameterNode.prepWinLevel = self.ui.sldWinLevel.value
+        self._parameterNode.prepWinWidth = self.ui.sldWinWidth.value
             
 
 
@@ -440,45 +476,8 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         ScriptedLoadableModuleLogic.__init__(self)
 
     def getParameterNode(self):
-        print(super().getParameterNode())
         return MedSAMLiteParameterNode(super().getParameterNode())
 
-    def process(self,
-                inputVolume: vtkMRMLScalarVolumeNode,
-                outputVolume: vtkMRMLScalarVolumeNode,
-                imageThreshold: float,
-                invert: bool = False,
-                showResult: bool = True) -> None:
-        """
-        Run the processing algorithm.
-        Can be used without GUI widget.
-        :param inputVolume: volume to be thresholded
-        :param outputVolume: thresholding result
-        :param imageThreshold: values above/below this threshold will be set to 0
-        :param invert: if True then values above the threshold will be set to 0, otherwise values below are set to 0
-        :param showResult: show output volume in slice viewers
-        """
-
-        if not inputVolume or not outputVolume:
-            raise ValueError("Input or output volume is invalid")
-
-        import time
-        startTime = time.time()
-        logging.info('Processing started')
-
-        # Compute the thresholded output volume using the "Threshold Scalar Volume" CLI module
-        cliParams = {
-            'InputVolume': inputVolume.GetID(),
-            'OutputVolume': outputVolume.GetID(),
-            'ThresholdValue': imageThreshold,
-            'ThresholdType': 'Above' if invert else 'Below'
-        }
-        cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True, update_display=showResult)
-        # We don't need the CLI module node anymore, remove it to not clutter the scene with it
-        slicer.mrmlScene.RemoveNode(cliNode)
-
-        stopTime = time.time()
-        logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
     
     def installTorch(self, version):
         # Install PyTorch
@@ -604,6 +603,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
     def run_server(self):
         #FIXME show that 'Backend is loading...'
         self.backend = MedSAM_Interface()
+        self.widget.renderAllParameters()
         self.backend.MedSAM_CKPT_PATH = self.widget.model_path_widget.currentPath
         self.backend.load_model()
         self.server_ready = True
@@ -653,13 +653,15 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         self.progressbar = slicer.util.createProgressDialog(autoClose=False)
         self.progressbar.minimum = 0
         self.progressbar.maximum = 100
-        self.progressbar.setLabelText("Wait for the embeddings")
+        self.progressbar.setLabelText("Preparing image embeddings...")
 
         self.timer = QTimer()
         self.timer.timeout.connect(lambda: self.progressCheck(partial))
         self.timer.start(1000)
 
         self.backend.set_image(self.image_data, -160, 240, zmin, zmax, recurrent_func=slicer.app.processEvents)
+
+        self.widget.updateAllParameters()
         # self.run_on_background(self.embedding_prep_wrapper, (self.image_data, -160, 240, zmin, zmax), "Preparing image embeddings...", lambda: self.progressCheck(partial))
     
     def embedding_prep_wrapper(self, arr, wmin, wmax, zmin, zmax, event):
@@ -679,7 +681,6 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         seg_data = self.backend.infer(slice_idx, bbox, zrange)
         frames = list(seg_data.keys())
         seg_result = np.zeros_like(self.image_data)
-        print('keys:', frames, 'result:', seg_result.shape)
         for frame in frames:
             seg_result[frame, :, :] = seg_data[frame]
 
@@ -709,6 +710,8 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         slicer.util.updateSegmentBinaryLabelmapFromArray(segmentation_mask, current_seg_group, segment_volume.GetName(), self.volume_node)
 
         slicer.mrmlScene.RemoveNode(segment_volume)
+
+        self.widget.updateAllParameters()
     
     def singleSegmentation(self):
         self.sendImage(partial=True)
@@ -725,6 +728,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         self.showSegmentation(segmentation_mask)
     
     def get_bounding_box(self):
+        self.captureImage()
         roiNode = slicer.util.getNode("R") # multiple bounding box?
 
         # If volume node is transformed, apply that transform to get volume's RAS coordinates
@@ -806,6 +810,8 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
 
         self.updateImage(prep_img)
 
+        self.widget.updateAllParameters()
+
 
 #
 # MedSAMLiteTest
@@ -868,13 +874,13 @@ class MedSAMLiteTest(ScriptedLoadableModuleTest):
         logic = MedSAMLiteLogic()
 
         # Test algorithm with non-inverted threshold
-        logic.process(inputVolume, outputVolume, threshold, True)
+        # logic.process(inputVolume, outputVolume, threshold, True)
         outputScalarRange = outputVolume.GetImageData().GetScalarRange()
         self.assertEqual(outputScalarRange[0], inputScalarRange[0])
         self.assertEqual(outputScalarRange[1], threshold)
 
         # Test algorithm with inverted threshold
-        logic.process(inputVolume, outputVolume, threshold, False)
+        # logic.process(inputVolume, outputVolume, threshold, False)
         outputScalarRange = outputVolume.GetImageData().GetScalarRange()
         self.assertEqual(outputScalarRange[0], inputScalarRange[0])
         self.assertEqual(outputScalarRange[1], inputScalarRange[1])
