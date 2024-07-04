@@ -14,17 +14,18 @@ You can watch a video tutorial of installation steps [here](https://youtu.be/qjs
 
 1. Install 3D Slicer from its official [website](https://download.slicer.org/). The compatibility of our plugin has been tested with 3D Slicer >= 5.4.0
 2. Download the specific version of the plugin from [releases](https://github.com/bowang-lab/MedSAMSlicer/releases) page and extract to your desired location.
-3. In the Slicer App, select the `Welcome to Slicer` drop-down menu in the toolbar at the top and navigate to `Developer Tools > Extension Wizard`.
-4. Click on `select Extension` and locate the `MedSAM` folder among the extracted files and directories at step 2. Accept if asked to add the new modules.
-5. Now, from the  `Welcome to Slicer` drop-down menu, under the `Segmentation` sub-menu, `MedSAMLite` option is added. By choosing it, you get to the final steps.
-6. `Choose a folder` to install module dependencies and click on `Install dependencies`. It can take several minutes.
-7. Restart 3D Slicer.
+3. In the Slicer App, press Ctrl+4 to open extension manager
+4. In "Install Extension" tab lookup PyTorch​ and install the extension. Our plugin currently relies on this. Restart Slicer.
+5. Select the `Welcome to Slicer` drop-down menu in the toolbar at the top and navigate to `Developer Tools > Extension Wizard`.
+6. Click on `select Extension` and locate the `MedSAM` folder among the extracted files and directories at step 2. Accept if asked to add the new modules.
+7. Now, from the  `Welcome to Slicer` drop-down menu, under the `Segmentation` sub-menu, `MedSAMLite` option is added. By choosing it, you get to the final steps.
+8. `Choose a folder` to install module dependencies and click on `Install dependencies`. It can take several minutes.
+9. Restart 3D Slicer.
 
 ## Upgrade
 
-**If you have version <= v0.05 installed:** Remove all pre-existing files from both step#2 and step#6 and install the new version as instructed before.
+Remove all pre-existing files from both step#2 and step#6 and install the new version as instructed before.
 
-**If you have version > v0.05 installed:** Use the *Upgrade Module* button at the top of the module interface to check for and install new updates.
 
 ## Usage
 
