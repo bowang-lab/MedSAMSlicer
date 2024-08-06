@@ -15,9 +15,13 @@ This code base relies extensively on SAM2 original code base. As 3D Slicer pytho
 Please install SAM 2 on a GPU machine using:
 
 ```bash
-git clone https://github.com/rasakereh/Slicer-SAM2.git
+git clone https://github.com/bowang-lab/MedSAMSlicer.git
 
-cd Slicer-SAM2; pip install -e .
+cd MedSAMSlicer
+
+git checkout SAM2
+
+pip install -e .
 ```
 
 You would also need to download checkpoints (various trained SAM2 models) to have a working segmentation core. You can do so by running:
