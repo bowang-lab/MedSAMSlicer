@@ -20,6 +20,128 @@ from segment_anything.modeling import MaskDecoder, PromptEncoder, TwoWayTransfor
 ####                                        vvvvvvvv  Main Code Area vvvvvvvv
 ####
 ##############################################################################################################################
+def bwperim(bw, n=4):
+    """
+    perim = bwperim(bw, n=4)
+    Find the perimeter of objects in binary images.
+    A pixel is part of an object perimeter if its value is one and there
+    is at least one zero-valued pixel in its neighborhood.
+    By default the neighborhood of a pixel is 4 nearest pixels, but
+    if `n` is set to 8 the 8 nearest pixels will be considered.
+    Parameters
+    ----------
+      bw : A black-and-white image
+      n : Connectivity. Must be 4 or 8 (default: 8)
+    Returns
+    -------
+      perim : A boolean image
+
+    From Mahotas: http://nullege.com/codes/search/mahotas.bwperim
+    """
+
+    if n not in (4,8):
+        raise ValueError('mahotas.bwperim: n must be 4 or 8')
+    rows,cols = bw.shape
+
+    # Translate image by one pixel in all directions
+    north = np.zeros((rows,cols))
+    south = np.zeros((rows,cols))
+    west = np.zeros((rows,cols))
+    east = np.zeros((rows,cols))
+
+    north[:-1,:] = bw[1:,:]
+    south[1:,:]  = bw[:-1,:]
+    west[:,:-1]  = bw[:,1:]
+    east[:,1:]   = bw[:,:-1]
+    idx = (north == bw) & \
+          (south == bw) & \
+          (west  == bw) & \
+          (east  == bw)
+    if n == 8:
+        north_east = np.zeros((rows, cols))
+        north_west = np.zeros((rows, cols))
+        south_east = np.zeros((rows, cols))
+        south_west = np.zeros((rows, cols))
+        north_east[:-1, 1:]   = bw[1:, :-1]
+        north_west[:-1, :-1] = bw[1:, 1:]
+        south_east[1:, 1:]     = bw[:-1, :-1]
+        south_west[1:, :-1]   = bw[:-1, 1:]
+        idx &= (north_east == bw) & \
+               (south_east == bw) & \
+               (south_west == bw) & \
+               (north_west == bw)
+    return ~idx * bw
+
+
+def signed_bwdist(im):
+    '''
+    Find perim and return masked image (signed/reversed)
+    '''
+    im = -bwdist(bwperim(im))*np.logical_not(im) + bwdist(bwperim(im))*im
+    return im
+
+def bwdist(im):
+    from scipy.ndimage import distance_transform_edt
+
+    '''
+    Find distance map of image
+    '''
+    dist_im = distance_transform_edt(1-im)
+    return dist_im
+
+
+
+def interp_shape(top, bottom, precision):
+    from scipy.interpolate import interpn
+
+    '''
+    Interpolate between two contours
+
+    Input: top
+            [X,Y] - Image of top contour (mask)
+           bottom
+            [X,Y] - Image of bottom contour (mask)
+           precision
+             float  - % between the images to interpolate
+                Ex: num=0.5 - Interpolate the middle image between top and bottom image
+    Output: out
+            [X,Y] - Interpolated image at num (%) between top and bottom
+
+    '''
+    if precision>2:
+        print("Error: Precision must be between 0 and 1 (float)")
+    
+    top, bottom = np.array(top), np.array(bottom)
+
+    top = signed_bwdist(top)
+    bottom = signed_bwdist(bottom)
+
+    # row,cols definition
+    r, c = top.shape
+
+    # Reverse % indexing
+    precision = 1+precision
+
+    # rejoin top, bottom into a single array of shape (2, r, c)
+    top_and_bottom = np.stack((top, bottom))
+
+    # create ndgrids
+    points = (np.r_[0, 2], np.arange(r), np.arange(c))
+
+    xi = np.rollaxis(np.mgrid[:r, :c], 0, 3).reshape((r*c, 2))
+    xi = np.c_[np.full((r*c),precision), xi]
+
+    # Interpolate for new plane
+    out = interpn(points, top_and_bottom, xi)
+    out = out.reshape((r, c))
+
+    # Threshold distmap to values above 0
+    out = out > 0
+
+    return out
+
+
+
 class MedSAM_Lite(nn.Module):
     def __init__(
             self, 
@@ -83,6 +205,7 @@ class MedSAM_Interface:
     W = None
     image = None
     embeddings = None
+    speed_level = 1
 
     def __init__(self):
         # 0. freeze seeds
@@ -237,7 +360,11 @@ class MedSAM_Interface:
             img_1024_tensor = (
                     torch.tensor(img_1024).float().permute(2, 0, 1).unsqueeze(0).to(self.device)
             )
-            if (zmax == -1) or ((zmin-1) <= slice_idx <= (zmax+1)):
+            
+            mid_slice = (zmax + zmin) // 2
+            calculation_condition = (zmax == -1) or ((zmin-1) <= slice_idx <= (zmax+1)) # Full embedding or partial embedding that lies between slices
+            skip_condition = abs(slice_idx - mid_slice) % self.speed_level != 0
+            if calculation_condition and not skip_condition:
                 with torch.no_grad():
                     embedding = self.medsam_model.image_encoder(img_1024_tensor)  # (1, 256, 64, 64)
             else:
@@ -280,14 +407,29 @@ class MedSAM_Interface:
             mask_t = transform.resize(mask, (256, 256), order=0, preserve_range=True, anti_aliasing=False).astype(np.uint8)
             return mask.tolist(), [self.get_bbox1024(mask_t)]
 
-        for csidx in range(slice_idx, zmax):
+        # adjusting slice_idx
+        available_idxs = np.array([i for i in range(len(self.embeddings)) if self.embeddings[i] is not None])
+        print(available_idxs)
+        slice_idx = available_idxs[np.argmin(np.abs(slice_idx - available_idxs))]
+        print('Adjusted slice_idx: ', slice_idx)
+
+        for csidx in range(slice_idx, zmax, self.speed_level):
             res[csidx], bbox_1024_prev = inf(bbox_1024_prev)
             if csidx == slice_idx:
                 bbox_1024_center_inf = bbox_1024_prev.copy()
 
         bbox_1024_prev = bbox_1024_center_inf
-        for csidx in range(slice_idx-1, zmin, -1):
+        for csidx in range(slice_idx-self.speed_level, zmin, -(self.speed_level)):
             res[csidx], bbox_1024_prev = inf(bbox_1024_prev)
+        
+
+        if self.speed_level != 1: # Skip embeddings has happened
+            frames = sorted(list(res.keys()))
+            for idx in range(len(frames) - 1):
+                frames_distance = frames[idx+1] - frames[idx]  # it is == speed_level except for middle slice
+                for f_idx in range(1, frames_distance):
+                    intermediate_slice = interp_shape(res[frames[idx+1]], res[frames[idx]], f_idx/frames_distance)
+                    res[frames[idx]+f_idx] = intermediate_slice
 
         return res
 

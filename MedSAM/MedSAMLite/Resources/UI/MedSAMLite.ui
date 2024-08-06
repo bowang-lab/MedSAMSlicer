@@ -93,9 +93,6 @@
       <string>Select the Region of Interest</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_3">
-      <item row="2" column="0" colspan="2">
-       <widget class="qMRMLMarkupsROIWidget" name="widgetROI"/>
-      </item>
       <item row="0" column="0">
        <widget class="QPushButton" name="pbAttach">
         <property name="text">
@@ -124,6 +121,9 @@
         </property>
        </widget>
       </item>
+      <item row="2" column="0" colspan="2">
+       <widget class="qMRMLMarkupsROIWidget" name="widgetROI"/>
+      </item>
      </layout>
     </widget>
    </item>
@@ -133,20 +133,6 @@
       <string>Start Segmentation</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_4">
-      <item row="2" column="0">
-       <widget class="QPushButton" name="pbSendImage">
-        <property name="text">
-         <string>Send Image</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="QPushButton" name="pbSegment">
-        <property name="text">
-         <string>Segmentation</string>
-        </property>
-       </widget>
-      </item>
       <item row="1" column="1">
        <widget class="ctkPathLineEdit" name="ctkPathModel">
         <property name="filters">
@@ -165,6 +151,23 @@
          <string>MedSAM Model:</string>
         </property>
        </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QPushButton" name="pbSegment">
+        <property name="text">
+         <string>Segmentation</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0">
+       <widget class="QPushButton" name="pbSendImage">
+        <property name="text">
+         <string>Send Image</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0" colspan="2">
+       <widget class="QComboBox" name="cmbSpeed"/>
       </item>
      </layout>
     </widget>

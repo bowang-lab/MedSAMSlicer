@@ -209,7 +209,7 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.editor.setMaximumNumberOfUndoStates(10)
         self.selectParameterNode()
         self.editor.setMRMLScene(slicer.mrmlScene)
-        self.ui.clbtnOperation.layout().addWidget(self.editor, 3, 0, 1, 2)
+        self.ui.clbtnOperation.layout().addWidget(self.editor, 4, 0, 1, 2)
         ############################################################################
 
         ###########################################################################
@@ -251,6 +251,9 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.widgetROI.findChild("QCheckBox", "insideOutCheckBox").hide()
         self.ui.widgetROI.findChild("QLabel", "label_10").hide()
         self.ui.widgetROI.findChild("QComboBox", "roiTypeComboBox").hide()
+
+        # Segmentation Speed
+        self.ui.cmbSpeed.addItems(['Normal Speed - Highest Quality', 'Faster Segmentation - High Quality', 'Fastest Segmentation - Moderate Quality'])
         
         self.ui.pbAttach.connect('clicked(bool)', lambda: self._createAndAttachROI())
         self.ui.pbTwoDim.connect('clicked(bool)', lambda: self.makeROI2D())
@@ -613,7 +616,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         progress_data = self.backend.get_progress()
         self.progressbar.value = progress_data['generated_embeds']
 
-        if progress_data['layers'] == progress_data['generated_embeds']:
+        if progress_data['layers'] <= progress_data['generated_embeds']:
             self.progressbar.close()
             self.timer.stop()
             self.widget.ui.pbSegment.setEnabled(True)
@@ -659,6 +662,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
         self.timer.timeout.connect(lambda: self.progressCheck(partial))
         self.timer.start(1000)
 
+        self.backend.speed_level = 1 if 'Normal' in self.widget.ui.cmbSpeed.currentText else 2 if 'Faster' in self.widget.ui.cmbSpeed.currentText else 3
         self.backend.set_image(self.image_data, -160, 240, zmin, zmax, recurrent_func=slicer.app.processEvents)
 
         self.widget.updateAllParameters()
