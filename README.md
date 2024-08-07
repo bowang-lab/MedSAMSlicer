@@ -1,6 +1,6 @@
-# Slicer-SAM 2: 3D Slicer Plugin for Segment Anything in Images and Videos
+# Slicer-[SAM 2](https://ai.meta.com/research/publications/sam-2-segment-anything-in-images-and-videos/): 3D Slicer Plugin for Segment Anything in Images and Videos
 
-[[`Paper`](https://ai.meta.com/research/publications/sam-2-segment-anything-in-images-and-videos/)] [[`BibTeX`](#citing-sam-2)]
+[[`Paper`](https://arxiv.org/abs/2408.03322)] [[`Code`](https://github.com/bowang-lab/MedSAM/tree/MedSAM2)] [[`Gradio API`](https://github.com/bowang-lab/MedSAM/blob/MedSAM2/app.py)] 
 
 ![Slicer-SAM 2 Screenshot](assets/slicer_plugin.png?raw=true)
 
