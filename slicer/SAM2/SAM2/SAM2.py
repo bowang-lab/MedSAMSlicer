@@ -261,6 +261,7 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
     image_data = None
     widget = None
     middleMaskNode = None
+    allSegmentsNode = None
     segmentation_res_path = '/home/rasakereh/Desktop'
 
     def __init__(self) -> None:
@@ -339,7 +340,7 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
         self.progressbar.close()
     
 
-    def segment_helper(self, img_path, gts_path, ip, port, job_event):
+    def segment_helper(self, img_path, gts_path, result_path, ip, port, job_event):
         self.progressbar.setLabelText(' uploading ground truth... ')
         upload_url = 'http://%s:%s/upload'%(ip, port)
 
@@ -374,13 +375,16 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
 
         response = requests.get(download_file_url, data={'output': 'data/video/segs_tiny/%s'%os.path.basename(img_path)})
 
-        with open('%s/result_%s'%(self.segmentation_res_path, os.path.basename(img_path) ), 'wb') as f: #TODO: arbitrary file name
+        with open(result_path, 'wb') as f: #TODO: arbitrary file name
             f.write(response.content)
         
         job_event.set()
     
     def showSegmentation(self, segmentation_mask, set_middle_mask=False):
-        current_seg_group = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode")
+        if self.allSegmentsNode is None:
+            self.allSegmentsNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode")
+
+        current_seg_group = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode") if set_middle_mask else self.allSegmentsNode
         current_seg_group.SetReferenceImageGeometryParameterFromVolumeNode(self.volume_node)
 
         labels = np.unique(segmentation_mask)[1:] # all labels except background(0)
@@ -413,13 +417,13 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
             np.savez(img_path, imgs=self.image_data, boxes=bboxes, z_range=[*zrange, slice_idx])
             print(f"image file saved at:", img_path)
             gts_path = '%s/gts.npz'%(tmpdirname,)
+            result_path = '%s/result.npz'%(tmpdirname,)
             np.savez(gts_path, segs=self.getSegmentationArray(self.middleMaskNode))
-            self.run_on_background(self.segment_helper, (img_path, gts_path, self.widget.ui.txtIP.plainText, self.widget.ui.txtPort.plainText), 'Segmenting...')
+            self.run_on_background(self.segment_helper, (img_path, gts_path, result_path, self.widget.ui.txtIP.plainText, self.widget.ui.txtPort.plainText), 'Segmenting...')
 
-        # loading results
-        segmentation_res_file = '%s/result_%s'%(self.segmentation_res_path, os.path.basename(img_path))
-        segmentation_mask = np.load(segmentation_res_file, allow_pickle=True)['segs']
-        self.showSegmentation(segmentation_mask)
+            # loading results
+            segmentation_mask = np.load(result_path, allow_pickle=True)['segs']
+            self.showSegmentation(segmentation_mask)
 
         roiNodes = slicer.util.getNodesByClass('vtkMRMLMarkupsROINode')
         for roiNode in roiNodes:
