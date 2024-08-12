@@ -1,6 +1,6 @@
-# Slicer-[SAM 2](https://ai.meta.com/research/publications/sam-2-segment-anything-in-images-and-videos/): 3D Slicer Plugin for Segment Anything in Images and Videos
+# Slicer-SAM 2: 3D Slicer Plugin for Segment Anything in Images and Videos
 
-[[`Paper`](https://arxiv.org/abs/2408.03322)] [[`Code`](https://github.com/bowang-lab/MedSAM/tree/MedSAM2)] [[`Gradio API`](https://github.com/bowang-lab/MedSAM/blob/MedSAM2/app.py)] 
+[[`Paper`](https://ai.meta.com/research/publications/sam-2-segment-anything-in-images-and-videos/)] [[`BibTeX`](#citing-sam-2)]
 
 ![Slicer-SAM 2 Screenshot](assets/slicer_plugin.png?raw=true)
 
@@ -9,19 +9,18 @@
 
 ## Installation
 
+[Installation Guide Video](https://youtu.be/i4h6qCuFbqE)
+
+
 This code base relies extensively on SAM2 original code base. As 3D Slicer python version at the time of development was 3.9 and SAM2 requires it to be at least 3.10, the segmentation core and plugin interface should be set up separately.
 
 ### Segmentation Backend Setup
-Please install SAM 2 on a GPU machine using:
+Please install SAM 2 on a GPU machine with CUDA>=12 using:
 
 ```bash
-git clone https://github.com/bowang-lab/MedSAMSlicer.git
+git clone https://github.com/rasakereh/Slicer-SAM2.git
 
-cd MedSAMSlicer
-
-git checkout SAM2
-
-pip install -e .
+cd Slicer-SAM2; pip install -e .
 ```
 
 You would also need to download checkpoints (various trained SAM2 models) to have a working segmentation core. You can do so by running:
@@ -38,6 +37,9 @@ cd checkpoints
 
 
 ## Getting Started
+
+[Usage Guide Video](https://youtu.be/kt1WN5BciVg)
+
 
 ### Run Backend
 
