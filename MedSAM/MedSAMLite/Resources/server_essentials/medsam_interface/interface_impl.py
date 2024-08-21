@@ -20,6 +20,7 @@ from segment_anything.modeling import MaskDecoder, PromptEncoder, TwoWayTransfor
 ####                                        vvvvvvvv  Main Code Area vvvvvvvv
 ####
 ##############################################################################################################################
+### next four functions were adopted from https://github.com/Zrrr1997/medsam_cvhci
 def bwperim(bw, n=4):
     """
     perim = bwperim(bw, n=4)
