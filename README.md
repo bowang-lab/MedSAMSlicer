@@ -29,6 +29,11 @@ cd checkpoints
 ./download_ckpts.sh
 ```
 
+To ensure the successful installation of the backend, you can run the following script:
+```bash
+python infer_video_tiny_debug.py --img_path 'img_data.npz' --gts_path X --propagate N --checkpoint tiny
+```
+
 ### Plugin Setup
 1. Install 3D Slicer from its official [website](https://download.slicer.org/). The compatibility of our plugin has been tested with 3D Slicer >= 5.4.0
 2. Select the `Welcome to Slicer` drop-down menu in the toolbar at the top and navigate to `Developer Tools > Extension Wizard`.
