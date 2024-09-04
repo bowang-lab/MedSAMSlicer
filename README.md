@@ -28,6 +28,12 @@ You would also need to download checkpoints (various trained SAM2 models) to hav
 cd checkpoints
 ./download_ckpts.sh
 ```
+Alternatively, if you are using powershell
+```bash
+cd checkpoints
+powershell -ExecutionPolicy Bypass -File .\download_checkpoints.ps1
+```
+
 
 To ensure the successful installation of the backend, you can run the following script:
 ```bash
