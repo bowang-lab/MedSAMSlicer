@@ -37,7 +37,7 @@ try:
 except:
     pass # no installation anymore, shorter plugin load
 
-MEDSAMLITE_VERSION = 'v0.1'
+MEDSAMLITE_VERSION = 'v0.11'
 
 #
 # MedSAMLite
