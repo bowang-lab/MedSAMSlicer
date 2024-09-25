@@ -207,7 +207,10 @@ def infer_3d(img_npz_file, gts_file, propagate):
     npz_data = np.load(img_npz_file, 'r', allow_pickle=True)
     gts = np.load(gts_file, 'r', allow_pickle=True)['segs'] if gts_file != 'X' else None
     img_3D = npz_data['imgs']  # (D, H, W)
-    assert np.max(img_3D) < 256, f'input data should be in range [0, 255], but got {np.unique(img_3D)}'
+    if np.max(img_3D) >= 256:
+        img_3D = (img_3D - np.min(img_3D)) / (np.max(img_3D) - np.min(img_3D)) * 255
+        img_3D = img_3D.astype(np.int32)
+    # assert np.max(img_3D) < 256, f'input data should be in range [0, 255], but got {np.unique(img_3D)}'
     D, H, W = img_3D.shape
     segs_3D = np.zeros(img_3D.shape, dtype=np.uint8)
     boxes_3D = npz_data['boxes']  # (D, num_boxes, 4)
