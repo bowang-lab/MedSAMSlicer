@@ -133,7 +133,21 @@
       <string>Start Segmentation</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_4">
-      <item row="1" column="1">
+      <item row="2" column="0">
+       <widget class="QLabel" name="lblModelSelection">
+        <property name="text">
+         <string>MedSAM Model:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="lblSubModel">
+        <property name="text">
+         <string>Submodel:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
        <widget class="ctkPathLineEdit" name="ctkPathModel">
         <property name="filters">
          <set>ctkPathLineEdit::Executable|ctkPathLineEdit::Files|ctkPathLineEdit::NoDot|ctkPathLineEdit::NoDotDot|ctkPathLineEdit::Readable</set>
@@ -141,33 +155,42 @@
         <property name="nameFilters">
          <stringlist>
           <string>*.pth</string>
+          <string>*.xml</string>
+          <string>*.onnx</string>
+          <string>*.ckpt</string>
          </stringlist>
         </property>
        </widget>
       </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="lblModelSelection">
-        <property name="text">
-         <string>MedSAM Model:</string>
-        </property>
-       </widget>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="cmbEngine"/>
       </item>
-      <item row="3" column="1">
-       <widget class="QPushButton" name="pbSegment">
-        <property name="text">
-         <string>Segmentation</string>
-        </property>
-       </widget>
+      <item row="3" column="0" colspan="2">
+       <widget class="QComboBox" name="cmbSpeed"/>
       </item>
-      <item row="3" column="0">
+      <item row="4" column="0">
        <widget class="QPushButton" name="pbSendImage">
         <property name="text">
          <string>Send Image</string>
         </property>
        </widget>
       </item>
-      <item row="2" column="0" colspan="2">
-       <widget class="QComboBox" name="cmbSpeed"/>
+      <item row="0" column="0">
+       <widget class="QLabel" name="lblEngineSelection">
+        <property name="text">
+         <string>Select Engine:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1">
+       <widget class="QPushButton" name="pbSegment">
+        <property name="text">
+         <string>Segmentation</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QComboBox" name="cmbSubModel"/>
       </item>
      </layout>
     </widget>
