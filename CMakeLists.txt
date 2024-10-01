@@ -4,13 +4,13 @@ project(MedSAM)
 
 #-----------------------------------------------------------------------------
 # Extension meta-information
-set(EXTENSION_HOMEPAGE "https://www.slicer.org/wiki/Documentation/Nightly/Extensions/MedSAM")
+set(EXTENSION_HOMEPAGE "https://github.com/bowang-lab/MedSAMSlicer")
 set(EXTENSION_CATEGORY "Segmentation")
 set(EXTENSION_CONTRIBUTORS "Reza Asakereh (University Health Network), Jun Ma (University Health Network), Andrew Qiao (University Health Network)")
-set(EXTENSION_DESCRIPTION "3D Slicer extension for MedSAM.")
-set(EXTENSION_ICONURL "https://www.example.com/Slicer/Extensions/MedSAM.png")
-set(EXTENSION_SCREENSHOTURLS "https://www.example.com/Slicer/Extensions/MedSAM/Screenshots/1.png")
-set(EXTENSION_DEPENDS "PyTorchUtils") # Specified as a list or "NA" if no dependencies
+set(EXTENSION_DESCRIPTION "This module implements MedSAMLite and several of its variant for universal 2D and 3D image segmentation.")
+set(EXTENSION_ICONURL "https://raw.githubusercontent.com/bowang-lab/MedSAMSlicer/master/MedSAM.png")
+set(EXTENSION_SCREENSHOTURLS "https://raw.githubusercontent.com/bowang-lab/MedSAMSlicer/master/MedSAMLite/Resources/Icons/Screenshot.png")
+set(EXTENSION_DEPENDS "PyTorch") # Specified as a list or "NA" if no dependencies
 
 #-----------------------------------------------------------------------------
 # Extension dependencies

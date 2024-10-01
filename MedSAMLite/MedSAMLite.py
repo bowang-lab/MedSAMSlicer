@@ -37,7 +37,7 @@ try:
 except:
     pass # no installation anymore, shorter plugin load
 
-MEDSAMLITE_VERSION = 'v0.11'
+MEDSAMLITE_VERSION = 'v0.12'
 
 #
 # MedSAMLite
@@ -158,6 +158,11 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         """
         ScriptedLoadableModuleWidget.setup(self)
 
+        if not hasattr(self, 'parameterSetNode'):
+            self._parameterNode = None
+            self._parameterNodeGuiTag = None
+            self.parameterSetNode = None
+
         # Create logic class. Logic implements all computations that should be possible to run
         # in batch mode, without a graphical user interface.
         self.logic = MedSAMLiteLogic()
@@ -169,7 +174,7 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Initial Dependency Setup
         try:
-            from segment_anything.modeling import MaskDecoder
+            from medsam_interface import MedSAM_Interface
             DEPENDENCIES_AVAILABLE = True
         except:
             DEPENDENCIES_AVAILABLE = False
@@ -238,6 +243,7 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
 
         # Buttons
+        self.ui.pbUpgrade.setVisible(False) # it's gliching so let's hide it :D
         self.ui.pbUpgrade.connect('clicked(bool)', lambda: self.logic.run_on_background(self.logic.upgrade, (True,), 'Checking for updates...'))
         self.ui.pbSendImage.connect('clicked(bool)', lambda: self.logic.sendImage(partial=False))
         self.ui.pbSegment.connect('clicked(bool)', lambda: self.logic.applySegmentation())
@@ -974,42 +980,24 @@ class MedSAMLiteTest(ScriptedLoadableModuleTest):
         your test should break so they know that the feature is needed.
         """
 
-        self.delayDisplay("Starting the test")
-        slicer.util.loadVolume('/home/rasakereh/Desktop/wanglab/MedSam/slicer-plugin/MedSAM-Slicer/HCC_004_0000.nii.gz')
-        logic = MedSAMLiteLogic()
-        logic.sendImage()
-        input()
-        logic.inferSegmentation()
-        return
-
         # Get/create input data
 
         import SampleData
-        registerSampleData()
-        inputVolume = SampleData.downloadSample('MedSAMLite1')
+        # registerSampleData()
+        inputVolume = SampleData.downloadSample('CTChest')
         self.delayDisplay('Loaded test data set')
 
-        inputScalarRange = inputVolume.GetImageData().GetScalarRange()
-        self.assertEqual(inputScalarRange[0], 0)
-        self.assertEqual(inputScalarRange[1], 695)
-
-        outputVolume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
-        threshold = 100
-
         # Test the module logic
-
-        logic = MedSAMLiteLogic()
+        widget = MedSAMLiteWidget()
+        widget.setup()
+        logic = widget.logic
+        logic.applyPreprocess('Abdominal CT', None, None)
+        logic.sendImage()
+        widget._createAndAttachROI()
+        logic.applySegmentation()
 
         # Test algorithm with non-inverted threshold
         # logic.process(inputVolume, outputVolume, threshold, True)
-        outputScalarRange = outputVolume.GetImageData().GetScalarRange()
-        self.assertEqual(outputScalarRange[0], inputScalarRange[0])
-        self.assertEqual(outputScalarRange[1], threshold)
-
-        # Test algorithm with inverted threshold
-        # logic.process(inputVolume, outputVolume, threshold, False)
-        outputScalarRange = outputVolume.GetImageData().GetScalarRange()
-        self.assertEqual(outputScalarRange[0], inputScalarRange[0])
-        self.assertEqual(outputScalarRange[1], inputScalarRange[1])
+        # self.assertEqual(outputScalarRange[1], inputScalarRange[1])
 
         self.delayDisplay('Test passed')
