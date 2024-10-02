@@ -209,7 +209,7 @@ def infer_3d(img_npz_file, gts_file, propagate):
     img_3D = npz_data['imgs']  # (D, H, W)
     if np.max(img_3D) >= 256:
         img_3D = (img_3D - np.min(img_3D)) / (np.max(img_3D) - np.min(img_3D)) * 255
-        img_3D = img_3D.astype(np.int32)
+        img_3D = img_3D.astype(np.int16)
     # assert np.max(img_3D) < 256, f'input data should be in range [0, 255], but got {np.unique(img_3D)}'
     D, H, W = img_3D.shape
     segs_3D = np.zeros(img_3D.shape, dtype=np.uint8)
