@@ -578,6 +578,7 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
     widget = None
     new_model_loaded = True
     backend = None
+    test_mode = False
 
     def __init__(self) -> None:
         """
@@ -725,8 +726,9 @@ class MedSAMLiteLogic(ScriptedLoadableModuleLogic):
     def download_if_necessary(self, model_url, model_path):
         model_path = os.path.dirname(model_path)
         if not os.path.isdir(model_path):
-            continueDownload = QMessageBox.question(None,'', "You need to download extra model files for this engine. Do you want to continue? (downloading %s to %s)"%(model_url, model_path), QMessageBox.Yes | QMessageBox.No)
-            if continueDownload == QMessageBox.No: return
+            if self.test_mode == False:
+                continueDownload = QMessageBox.question(None,'', "You need to download extra model files for this engine. Do you want to continue? (downloading %s to %s)"%(model_url, model_path), QMessageBox.Yes | QMessageBox.No)
+                if continueDownload == QMessageBox.No: return
             self.run_on_background(self.download_model, (model_url, model_path), "Downloading model files...")
     
     def run_server(self):
@@ -965,10 +967,21 @@ class MedSAMLiteTest(ScriptedLoadableModuleTest):
     def runTest(self):
         """Run as few or as many tests as needed here.
         """
+        self.delayDisplay('Classic MedSAM test')
         self.setUp()
-        self.test_MedSAMLite1()
+        self.test_classic()
+        self.delayDisplay('Classic MedSAM test with skips and partial embedding')
+        self.setUp()
+        self.test_skip_and_single()
+        self.delayDisplay('OpenVINO test')
+        self.setUp()
+        self.test_openvino()
+        self.delayDisplay('2D colored test')
+        self.setUp()
+        self.test_2D_colored()
 
-    def test_MedSAMLite1(self):
+
+    def test_classic(self):
         """ Ideally you should have several levels of tests.  At the lowest level
         tests should exercise the functionality of the logic with different inputs
         (both valid and invalid).  At higher levels your tests should emulate the
@@ -991,13 +1004,80 @@ class MedSAMLiteTest(ScriptedLoadableModuleTest):
         widget = MedSAMLiteWidget()
         widget.setup()
         logic = widget.logic
+        logic.test_mode = True
         logic.applyPreprocess('Abdominal CT', None, None)
         logic.sendImage()
         widget._createAndAttachROI()
         logic.applySegmentation()
+        logic.test_mode = False
 
         # Test algorithm with non-inverted threshold
         # logic.process(inputVolume, outputVolume, threshold, True)
         # self.assertEqual(outputScalarRange[1], inputScalarRange[1])
+
+        self.delayDisplay('Test passed')
+    
+    def test_skip_and_single(self):
+        # Get/create input data
+
+        import SampleData
+        # registerSampleData()
+        inputVolume = SampleData.downloadSample('CTChest')
+        self.delayDisplay('Loaded test data set')
+
+        # Test the module logic
+        widget = MedSAMLiteWidget()
+        widget.setup()
+        logic = widget.logic
+        logic.test_mode = True
+        logic.applyPreprocess('Abdominal CT', None, None)
+        widget._createAndAttachROI()
+        widget.ui.cmbSpeed.setCurrentIndex(2)
+        logic.sendImage(partial=True)
+        logic.test_mode = False
+
+        self.delayDisplay('Test passed')
+    
+    def test_openvino(self):
+        # Get/create input data
+
+        import SampleData
+        # registerSampleData()
+        inputVolume = SampleData.downloadSample('CTChest')
+        self.delayDisplay('Loaded test data set')
+
+        # Test the module logic
+        widget = MedSAMLiteWidget()
+        widget.setup()
+        logic = widget.logic
+        logic.test_mode = True
+        logic.applyPreprocess('Abdominal CT', None, None)
+        widget._createAndAttachROI()
+        widget.ui.cmbEngine.setCurrentIndex(1)
+        logic.sendImage()
+        logic.applySegmentation()
+        logic.test_mode = False
+
+        self.delayDisplay('Test passed')
+
+
+    def test_2D_colored(self):
+        # Get/create input data
+
+        img_file = os.path.join(os.path.dirname(__file__), 'Testing', 'kidney.png')
+        slicer.util.loadVolume(img_file)
+        self.delayDisplay('Loaded test data set')
+
+        # Test the module logic
+        widget = MedSAMLiteWidget()
+        widget.setup()
+        logic = widget.logic
+        logic.test_mode = True
+        widget._createAndAttachROI()
+        widget.setROIboundary(lower=True)
+        widget.setROIboundary(lower=False)
+        logic.sendImage()
+        logic.applySegmentation()
+        logic.test_mode = False
 
         self.delayDisplay('Test passed')
