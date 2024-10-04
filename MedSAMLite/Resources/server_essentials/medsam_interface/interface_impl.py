@@ -4,7 +4,7 @@ engine_classes = {
     'Classic MedSAM': ClassicMedSAM,
     'OpenVino MedSAM': OVMedSAMCore,
     'DAFT MedSAM': DAFTSAMCore,
-    # 'Medficient SAM': MedficientSAMCore,
+    'Medficient SAM': MedficientSAMCore,
 }
 
 class MedSAM_Interface:

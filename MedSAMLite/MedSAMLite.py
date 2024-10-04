@@ -37,7 +37,7 @@ try:
 except:
     pass # no installation anymore, shorter plugin load
 
-MEDSAMLITE_VERSION = 'v0.12'
+MEDSAMLITE_VERSION = 'v0.13'
 
 #
 # MedSAMLite
@@ -280,6 +280,15 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 'submodels': {}
             },
             {
+                'name': 'Medficient SAM',
+                'description': 'Medficient SAM is an efficient and high accuracy alternative to classic MedSAMLite that can benefit from an existing NVIDIA GPU for faster segmentations. No approximate segmentation support.',
+                'default checkpoint': os.path.join(self.logic.server_dir, 'medsam_interface/models/medficient/model.pth'),
+                'controls to hide': [self.ui.cmbSpeed, self.ui.lblSubModel, self.ui.cmbSubModel],
+                'controls to show': [],
+                'url': 'https://drive.google.com/drive/folders/1gzNPIEe9NX444EaFEHw58Wt23q_5OyNJ?usp=sharing',
+                'submodels': {}
+            },
+            {
                 'name': 'DAFT MedSAM',
                 'description': 'DAFT MedSAM is one of the fastest engines as it uses a relatively smaller data-specific model and OpenVINO backend. No approximate segmentation nor GPU support and need for user\'s mindful model selection are the cons.',
                 'default checkpoint': '',
@@ -299,15 +308,6 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     'XRay': {'checkpoint': os.path.join(self.logic.server_dir, 'medsam_interface/models/daft/XRay/image_encoder.xml'), 'url': 'https://drive.google.com/drive/folders/120gqhi-psC0c1W-D18iXiya9zuH2a9nX?usp=drive_link'},
                 }
             },
-            # {
-            #     'name': 'Medficient SAM',
-            #     'description': 'Medficient SAM [.... placeholder ....]',
-            #     'default checkpoint': os.path.join(self.logic.server_dir, 'medsam_interface/models/medficient/model.pth'),
-            #     'controls to hide': [self.ui.cmbSpeed, self.ui.lblSubModel, self.ui.cmbSubModel],
-            #     'controls to show': [],
-            #     'url': '',
-            #     'submodels': {}
-            # },
         ]
 
         self.ui.cmbEngine.addItems(list(map(lambda x: x['name'], self.engine_list)))
