@@ -42,6 +42,7 @@ def run_script():
     ]
     process = subprocess.Popen(script_parameters, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
+    print('=================================\n', stderr, '\n=================================')
 
     #TODO: remove custom model?
     
