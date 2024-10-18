@@ -13,13 +13,14 @@ def run_script():
     gts_name = request.form.get('gts')
     propagate = request.form.get('propagate')
     checkpoint = 'checkpoints/2.1/%s'%(request.form.get('checkpoint'),)
-    if 'tiny' in checkpoint:
+    size = request.form.get('size')
+    if size == 'tiny':
         cfg_suffix = 't'
-    elif 'small' in checkpoint:
+    elif size == 'small':
         cfg_suffix = 's'
-    elif 'large' in checkpoint:
+    elif size == 'large':
         cfg_suffix = 'l'
-    elif 'base' in checkpoint:
+    elif size == 'base':
         cfg_suffix = 'b+'
     cfg = 'sam2.1_hiera_%s.yaml'%(cfg_suffix,)
 

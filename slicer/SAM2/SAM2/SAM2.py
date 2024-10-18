@@ -129,10 +129,8 @@ class SAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.cmbPrepOptions.currentTextChanged.connect(lambda new_text: self.setManualPreprocessVis(new_text == 'Manual'))
         self.ui.pbApplyPrep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.ui.cmbPrepOptions.currentText, self.ui.sldWinLevel.value, self.ui.sldWinWidth.value))
 
-        self.ui.cmbCheckpoint.addItems(['sam2.1_hiera_tiny.pt', 'sam2.1_hiera_small.pt', 'sam2.1_hiera_base_plus.pt', 'sam2.1_hiera_large.pt', 'Custom Model...'])
-        self.ui.cmbCheckpoint.currentTextChanged.connect(lambda new_text: self.ui.pathModel.setVisible(new_text == 'Custom Model...'))
-        self.ui.pathModel.hide()
-
+        self.ui.cmbCheckpoint.addItems(['tiny', 'small', 'base_plus', 'large'])
+        
         # Setting icons
         # Icons used here are downloaded from flaticon's free icons package. Detailed attributes can be found in slicer/SAM2/SAM2/Resources/Icons/attribute.html 
         from PythonQt.QtGui import QIcon
@@ -343,8 +341,8 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
     
 
     def segment_helper(self, img_path, gts_path, result_path, ip, port, job_event):
-        if self.widget.ui.cmbCheckpoint.currentText != 'Custom Model...':
-            checkpoint = self.widget.ui.cmbCheckpoint.currentText
+        if self.widget.ui.pathModel.currentPath == '':
+            checkpoint = 'sam2.1_hiera_%s.pt'%(self.widget.ui.cmbCheckpoint.currentText,)
         else:
             model_name = os.path.basename(self.widget.ui.pathModel.currentPath).split('.')[0]
             checkpoint = os.path.join(model_name, os.path.basename(self.widget.ui.pathModel.currentPath))
@@ -364,7 +362,8 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
                 'checkpoint': checkpoint,
                 'input': os.path.basename(img_path),
                 'gts': os.path.basename(gts_path),
-                'propagate': 'Y'
+                'propagate': 'Y',
+                'size': self.widget.ui.cmbCheckpoint.currentText,
             })
 
         response = requests.post(
@@ -373,7 +372,8 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
                 'checkpoint': checkpoint,
                 'input': os.path.basename(img_path),
                 'gts': os.path.basename(gts_path),
-                'propagate': 'Y'
+                'propagate': 'Y',
+                'size': self.widget.ui.cmbCheckpoint.currentText,
             }
         )
 
@@ -439,14 +439,14 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
         self.boundaries = None
     
     def middle_mask_helper(self, img_path, result_path, ip, port, job_event):
-        if self.widget.ui.cmbCheckpoint.currentText != 'Custom Model...':
-            checkpoint = self.widget.ui.cmbCheckpoint.currentText
+        if self.widget.ui.pathModel.currentPath == '':
+            checkpoint = 'sam2.1_hiera_%s.pt'%(self.widget.ui.cmbCheckpoint.currentText,)
         else:
             model_name = os.path.basename(self.widget.ui.pathModel.currentPath).split('.')[0]
             checkpoint = os.path.join(model_name, os.path.basename(self.widget.ui.pathModel.currentPath))
         
-        if self.widget.ui.cmbCheckpoint.currentText == 'Custom Model...':
-            # TODO: Check if model is a valid folder
+        if self.widget.ui.pathModel.currentPath != '':
+            # TODO: Check if model is valid
             self.progressbar.setLabelText(' uploading model... ')
             upload_url = 'http://%s:%s/upload_model'%(ip, port)
 
@@ -469,7 +469,8 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
                 'checkpoint': checkpoint,
                 'input': os.path.basename(img_path),
                 'gts': 'X',
-                'propagate': 'N'
+                'propagate': 'N',
+                'size': self.widget.ui.cmbCheckpoint.currentText,
             })
 
         response = requests.post(
@@ -478,7 +479,8 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
                 'checkpoint': checkpoint,
                 'input': os.path.basename(img_path),
                 'gts': 'X',
-                'propagate': 'N'
+                'propagate': 'N',
+                'size': self.widget.ui.cmbCheckpoint.currentText,
             }
         )
 
