@@ -24,10 +24,7 @@ Please install SAM 2.1 on a GPU machine with CUDA>=12.4 using:
 - Install [PyTorch](https://pytorch.org/get-started/locally/) 2.4: `conda install pytorch torchvision pytorch-cuda=12.4 -c pytorch -c nvidia`
 - `pip install -e .`
 - `pip install -r requirements.txt`
-
-You would also need to download checkpoints (various trained SAM2.1 models) and config files to have a working segmentation core. You can do so by running: `./extra_files.sh`
-
-Alternatively, if you are using powershell: `powershell -ExecutionPolicy Bypass -File .\extra_files.ps1`
+- Download checkpoints (various trained SAM2.1 models) and config files: `./extra_files.sh`. Alternatively, if you are using powershell: `powershell -ExecutionPolicy Bypass -File .\extra_files.ps1`
 
 
 To ensure the successful installation of the backend, you can run the following script:
@@ -38,7 +35,7 @@ python infer_SAM21_slicer.py --cfg sam2.1_hiera_t.yaml --img_path img_data.npz -
 ### Plugin Setup
 1. Install 3D Slicer from its official [website](https://download.slicer.org/). The compatibility of our plugin has been tested with 3D Slicer >= 5.4.0
 2. Select the `Welcome to Slicer` drop-down menu in the toolbar at the top and navigate to `Developer Tools > Extension Wizard`.
-3. Click on `select Extension` and locate the `SAM2` folder under `MedSAM2/slicer`. Confirm if asked to import new module.
+3. Click on `select Extension` and locate the `MedSAM2` folder under `MedSAM2/slicer`. Confirm if asked to import new module.
 4. Now, from the  `Welcome to Slicer` drop-down menu, under the `Segmentation` sub-menu, `MedSAM2` option is added. By choosing it, you can start using the plugin.
 
 

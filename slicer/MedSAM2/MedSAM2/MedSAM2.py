@@ -24,18 +24,18 @@ import time
 
 
 #
-# SAM2
+# MedSAM2
 #
 
 
-class SAM2(ScriptedLoadableModule):
+class MedSAM2(ScriptedLoadableModule):
     """Uses ScriptedLoadableModule base class, available at:
     https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
     """
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = _("SAM2")  # TODO: make this more human readable by adding spaces
+        self.parent.title = _("MedSAM2")  # TODO: make this more human readable by adding spaces
         # TODO: set categories (folders where the module shows up in the module selector)
         self.parent.categories = [translate("qSlicerAbstractCoreModule", "Segmentation")]
         self.parent.dependencies = []  # TODO: add here list of module names that this module requires
@@ -44,7 +44,7 @@ class SAM2(ScriptedLoadableModule):
         # _() function marks text as translatable to other languages
         self.parent.helpText = _("""
 This is an example of scripted loadable module bundled in an extension.
-See more information in <a href="https://github.com/organization/projectname#SAM2">module documentation</a>.
+See more information in <a href="https://github.com/organization/projectname#MedSAM2">module documentation</a>.
 """)
         # TODO: replace with organization, grant and thanks
         self.parent.acknowledgementText = _("""
@@ -57,12 +57,12 @@ and Steve Pieper, Isomics, Inc. and was partially funded by NIH grant 3P41RR0132
 
 
 #
-# SAM2ParameterNode
+# MedSAM2ParameterNode
 #
 
 
 @parameterNodeWrapper
-class SAM2ParameterNode:
+class MedSAM2ParameterNode:
     """
     The parameters needed by module.
 
@@ -81,11 +81,11 @@ class SAM2ParameterNode:
 
 
 #
-# SAM2Widget
+# MedSAM2Widget
 #
 
 
-class SAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
+class MedSAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     """Uses ScriptedLoadableModuleWidget base class, available at:
     https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
     """
@@ -104,7 +104,7 @@ class SAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Load widget from .ui file (created by Qt Designer).
         # Additional widgets can be instantiated manually and added to self.layout.
-        uiWidget = slicer.util.loadUI(self.resourcePath("UI/SAM2.ui"))
+        uiWidget = slicer.util.loadUI(self.resourcePath("UI/MedSAM2.ui"))
         self.layout.addWidget(uiWidget)
         self.ui = slicer.util.childWidgetVariables(uiWidget)
 
@@ -115,7 +115,7 @@ class SAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Create logic class. Logic implements all computations that should be possible to run
         # in batch mode, without a graphical user interface.
-        self.logic = SAM2Logic()
+        self.logic = MedSAM2Logic()
         self.logic.widget = self
 
         # Connections
@@ -130,9 +130,10 @@ class SAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.pbApplyPrep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.ui.cmbPrepOptions.currentText, self.ui.sldWinLevel.value, self.ui.sldWinWidth.value))
 
         self.ui.cmbCheckpoint.addItems(['tiny', 'small', 'base_plus', 'large'])
+        self.ui.pathModel.connect('currentPathChanged(const QString&)', lambda: setattr(self.logic, 'newModelUploaded', False))
         
         # Setting icons
-        # Icons used here are downloaded from flaticon's free icons package. Detailed attributes can be found in slicer/SAM2/SAM2/Resources/Icons/attribute.html 
+        # Icons used here are downloaded from flaticon's free icons package. Detailed attributes can be found in slicer/MedSAM2/MedSAM2/Resources/Icons/attribute.html 
         from PythonQt.QtGui import QIcon
         iconsPath = os.path.join(os.path.dirname(__file__), 'Resources/Icons')
         self.ui.pbApplyPrep.setIcon(QIcon(os.path.join(iconsPath, 'verify.png')))
@@ -200,7 +201,7 @@ class SAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             if firstVolumeNode:
                 self._parameterNode.inputVolume = firstVolumeNode
 
-    def setParameterNode(self, inputParameterNode: Optional[SAM2ParameterNode]) -> None:
+    def setParameterNode(self, inputParameterNode: Optional[MedSAM2ParameterNode]) -> None:
         """
         Set and observe parameter node.
         Observation is needed because when the parameter node is changed then the GUI must be updated immediately.
@@ -242,11 +243,11 @@ class SAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
 
 #
-# SAM2Logic
+# MedSAM2Logic
 #
 
 
-class SAM2Logic(ScriptedLoadableModuleLogic):
+class MedSAM2Logic(ScriptedLoadableModuleLogic):
     """This class should implement all the actual
     computation done by your module.  The interface
     should be such that other python code can import
@@ -262,6 +263,7 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
     widget = None
     middleMaskNode = None
     allSegmentsNode = None
+    newModelUploaded = False
     segmentation_res_path = '/home/rasakereh/Desktop'
 
     def __init__(self) -> None:
@@ -269,10 +271,21 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
         ScriptedLoadableModuleLogic.__init__(self)
 
     def getParameterNode(self):
-        return SAM2ParameterNode(super().getParameterNode())
+        return MedSAM2ParameterNode(super().getParameterNode())
     
     def captureImage(self):
         self.volume_node = slicer.util.getNodesByClass('vtkMRMLScalarVolumeNode')[0]
+        if self.volume_node.GetNodeTagName() == 'LabelMapVolume': ### some volumes are loaded as LabelMapVolume instead of ScalarVolume, temporary
+            outputvolume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode", self.volume_node.GetName())
+            sef = slicer.modules.volumes.logic().CreateScalarVolumeFromVolume(slicer.mrmlScene, outputvolume, self.volume_node)
+            slicer.mrmlScene.RemoveNode(self.volume_node)
+
+            appLogic = slicer.app.applicationLogic()
+            selectionNode = appLogic.GetSelectionNode()
+            selectionNode.SetActiveVolumeID(sef.GetID())
+            appLogic.PropagateVolumeSelection()
+            self.volume_node = sef
+
         self.image_data = slicer.util.arrayFromVolume(self.volume_node)  ################ Only one node?
     
     def get_bounding_box(self, make2d=False):
@@ -427,7 +440,7 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
             gts_path = '%s/gts.npz'%(tmpdirname,)
             result_path = '%s/result.npz'%(tmpdirname,)
             np.savez(gts_path, segs=self.getSegmentationArray(self.middleMaskNode))
-            self.run_on_background(self.segment_helper, (img_path, gts_path, result_path, self.widget.ui.txtIP.plainText, self.widget.ui.txtPort.plainText), 'Segmenting...')
+            self.run_on_background(self.segment_helper, (img_path, gts_path, result_path, self.widget.ui.txtIP.plainText.strip().strip(), self.widget.ui.txtPort.plainText.strip()), 'Segmenting...')
 
             # loading results
             segmentation_mask = np.load(result_path, allow_pickle=True)['segs']
@@ -445,7 +458,7 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
             model_name = os.path.basename(self.widget.ui.pathModel.currentPath).split('.')[0]
             checkpoint = os.path.join(model_name, os.path.basename(self.widget.ui.pathModel.currentPath))
         
-        if self.widget.ui.pathModel.currentPath != '':
+        if self.widget.ui.pathModel.currentPath != '' and not self.newModelUploaded:
             # TODO: Check if model is valid
             self.progressbar.setLabelText(' uploading model... ')
             upload_url = 'http://%s:%s/upload_model'%(ip, port)
@@ -453,6 +466,7 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
             with open(self.widget.ui.pathModel.currentPath, 'rb') as file:
                 files = {'file': file}
                 response = requests.post(upload_url, files=files)
+                self.newModelUploaded = True # used for caching
 
         self.progressbar.setLabelText(' uploading image... ')
         upload_url = 'http://%s:%s/upload'%(ip, port)
@@ -503,7 +517,7 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
             img_path = "%s/img_data.npz"%(tmpdirname,)
             result_path = "%s/result.npz"%(tmpdirname,)
             np.savez(img_path, imgs=self.image_data, boxes=bboxes, z_range=[*zrange, slice_idx])
-            self.run_on_background(self.middle_mask_helper, (img_path, result_path, self.widget.ui.txtIP.plainText, self.widget.ui.txtPort.plainText), 'Segmenting...')
+            self.run_on_background(self.middle_mask_helper, (img_path, result_path, self.widget.ui.txtIP.plainText.strip(), self.widget.ui.txtPort.plainText.strip()), 'Segmenting...')
             
             # loading results
             segmentation_mask = np.load(result_path, allow_pickle=True)['segs']
@@ -579,11 +593,11 @@ class SAM2Logic(ScriptedLoadableModuleLogic):
 
 
 #
-# SAM2Test
+# MedSAM2Test
 #
 
 
-class SAM2Test(ScriptedLoadableModuleTest):
+class MedSAM2Test(ScriptedLoadableModuleTest):
     """
     This is the test case for your scripted module.
     Uses ScriptedLoadableModuleTest base class, available at:
@@ -597,9 +611,9 @@ class SAM2Test(ScriptedLoadableModuleTest):
     def runTest(self):
         """Run as few or as many tests as needed here."""
         self.setUp()
-        self.test_SAM21()
+        self.test_MedSAM21()
 
-    def test_SAM21(self):
+    def test_MedSAM21(self):
         """Ideally you should have several levels of tests.  At the lowest level
         tests should exercise the functionality of the logic with different inputs
         (both valid and invalid).  At higher levels your tests should emulate the
