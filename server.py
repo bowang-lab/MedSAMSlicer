@@ -14,15 +14,6 @@ def run_script():
     propagate = request.form.get('propagate')
     checkpoint = 'checkpoints/2.1/%s'%(request.form.get('checkpoint'),)
     cfg = request.form.get('config')
-    if size == 'tiny':
-        cfg_suffix = 't'
-    elif size == 'small':
-        cfg_suffix = 's'
-    elif size == 'large':
-        cfg_suffix = 'l'
-    elif size == 'base':
-        cfg_suffix = 'b+'
-    cfg = 'sam2.1_hiera_%s.yaml'%(cfg_suffix,)
 
     script_parameters = [
         'python',
@@ -78,11 +69,11 @@ def upload_model():
 @app.route('/upload_config', methods=['POST'])
 def upload_config():    
     file = request.files['file']
-    config_dir = "./custom_configs"
+    config_dir = "./sam2"
 
     Path(config_dir).mkdir(parents=True, exist_ok=True)
 
-    file.save(os.path.join(config_dir, os.path.basename(file.filename)))
+    file.save(os.path.join(config_dir, 'custom_' + os.path.basename(file.filename)))
     return 'Config file uploaded successfully'
 
 if __name__ == '__main__':

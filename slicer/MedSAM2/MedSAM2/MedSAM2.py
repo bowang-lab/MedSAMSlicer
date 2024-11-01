@@ -599,7 +599,7 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
                 config_suffix = config_suffix + '+'
             config = 'sam2.1_hiera_%s.yaml'%(config_suffix,)
         else:
-            config = os.path.join('custom_configs', os.path.basename(self.widget.ui.pathConfig.currentPath))
+            config = 'custom_' + os.path.basename(self.widget.ui.pathConfig.currentPath)
         
         if self.widget.ui.pathModel.currentPath == '':
             checkpoint = 'sam2.1_hiera_%s.pt'%(self.widget.ui.cmbCheckpoint.currentText,)

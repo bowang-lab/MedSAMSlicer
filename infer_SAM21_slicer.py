@@ -97,15 +97,15 @@ def infer_3d(img_npz_file, gts_file, propagate):
         img_3D = (img_3D - np.min(img_3D)) / (np.max(img_3D) - np.min(img_3D)) * 255
         img_3D = img_3D.astype(np.int16)
     # assert np.max(img_3D) < 256, f'input data should be in range [0, 255], but got {np.unique(img_3D)}'
-    D, H, W = img_3D.shape
-    segs_3D = np.zeros(img_3D.shape, dtype=np.uint8)
+    D, H, W = img_3D.shape[:3]
+    segs_3D = np.zeros(img_3D.shape[:3], dtype=np.uint8)
     boxes_3D = npz_data['boxes']  # (D, num_boxes, 4)
     z_range = npz_data['z_range'] # (z_min, z_max, slice_idx)
     video_height = img_3D.shape[1]
     video_width = img_3D.shape[2]
-    with open(model_cfg, 'r') as yaml_file:
+    with open(join('sam2', model_cfg), 'r') as yaml_file:
         yaml_data = yaml.safe_load(yaml_file)
-        image_size = yaml_data['model']['image_size'])
+        image_size = yaml_data['model']['image_size']
     img_resized = resize_grayscale_to_rgb_and_resize(img_3D, image_size)
     img_resized = img_resized / 255.0
     img_resized = torch.from_numpy(img_resized).cuda()
