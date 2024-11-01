@@ -148,36 +148,10 @@
       <string>Segmentation</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_4">
-      <item row="3" column="1" colspan="2">
-       <widget class="QPushButton" name="btnSegment">
-        <property name="text">
-         <string>Full Segmention</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0" colspan="2">
+      <item row="3" column="0" colspan="2">
        <widget class="QPushButton" name="btnMiddleSlice">
         <property name="text">
          <string>Segment Middle Slice</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="2" colspan="2">
-       <widget class="QPushButton" name="btnRefine">
-        <property name="text">
-         <string>Refine Middle Segmention</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="2" colspan="2">
-       <widget class="ctkPathLineEdit" name="pathModel">
-        <property name="filters">
-         <set>ctkPathLineEdit::Executable|ctkPathLineEdit::Files|ctkPathLineEdit::NoDot|ctkPathLineEdit::NoDotDot|ctkPathLineEdit::Readable</set>
-        </property>
-        <property name="nameFilters">
-         <stringlist>
-          <string>*.pt</string>
-         </stringlist>
         </property>
        </widget>
       </item>
@@ -201,6 +175,51 @@
         </property>
         <property name="alignment">
          <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="2" colspan="2">
+       <widget class="ctkPathLineEdit" name="pathModel">
+        <property name="filters">
+         <set>ctkPathLineEdit::Executable|ctkPathLineEdit::Files|ctkPathLineEdit::NoDot|ctkPathLineEdit::NoDotDot|ctkPathLineEdit::Readable</set>
+        </property>
+        <property name="nameFilters">
+         <stringlist>
+          <string>*.pt</string>
+         </stringlist>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1" colspan="2">
+       <widget class="QPushButton" name="btnSegment">
+        <property name="text">
+         <string>Full Segmention</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="2" colspan="2">
+       <widget class="QPushButton" name="btnRefine">
+        <property name="text">
+         <string>Refine Middle Segmention</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0" colspan="2">
+       <widget class="QLabel" name="label_4">
+        <property name="text">
+         <string>Config File (Empty for Default):</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="2" colspan="2">
+       <widget class="ctkPathLineEdit" name="pathConfig">
+        <property name="nameFilters">
+         <stringlist>
+          <string>*.yaml</string>
+         </stringlist>
         </property>
        </widget>
       </item>

@@ -13,7 +13,7 @@ def run_script():
     gts_name = request.form.get('gts')
     propagate = request.form.get('propagate')
     checkpoint = 'checkpoints/2.1/%s'%(request.form.get('checkpoint'),)
-    size = request.form.get('size')
+    cfg = request.form.get('config')
     if size == 'tiny':
         cfg_suffix = 't'
     elif size == 'small':
@@ -75,6 +75,15 @@ def upload_model():
     file.save(os.path.join(checkpoint_dir, os.path.basename(file.filename)))
     return 'Model uploaded successfully'
 
+@app.route('/upload_config', methods=['POST'])
+def upload_config():    
+    file = request.files['file']
+    config_dir = "./custom_configs"
+
+    Path(config_dir).mkdir(parents=True, exist_ok=True)
+
+    file.save(os.path.join(config_dir, os.path.basename(file.filename)))
+    return 'Config file uploaded successfully'
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)

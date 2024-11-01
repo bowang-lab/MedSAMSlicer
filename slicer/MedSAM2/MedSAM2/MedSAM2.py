@@ -131,6 +131,7 @@ class MedSAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self.ui.cmbCheckpoint.addItems(['tiny', 'small', 'base_plus', 'large'])
         self.ui.pathModel.connect('currentPathChanged(const QString&)', lambda: setattr(self.logic, 'newModelUploaded', False))
+        self.ui.pathConfig.connect('currentPathChanged(const QString&)', lambda: setattr(self.logic, 'newConfigUploaded', False))
         
         # Setting icons
         # Icons used here are downloaded from flaticon's free icons package. Detailed attributes can be found in slicer/MedSAM2/MedSAM2/Resources/Icons/attribute.html 
@@ -264,6 +265,7 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
     middleMaskNode = None
     allSegmentsNode = None
     newModelUploaded = False
+    newConfigUploaded = False
     segmentation_res_path = '/home/rasakereh/Desktop'
 
     def __init__(self) -> None:
@@ -354,11 +356,7 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
     
 
     def segment_helper(self, img_path, gts_path, result_path, ip, port, job_event):
-        if self.widget.ui.pathModel.currentPath == '':
-            checkpoint = 'sam2.1_hiera_%s.pt'%(self.widget.ui.cmbCheckpoint.currentText,)
-        else:
-            model_name = os.path.basename(self.widget.ui.pathModel.currentPath).split('.')[0]
-            checkpoint = os.path.join(model_name, os.path.basename(self.widget.ui.pathModel.currentPath))
+        config, checkpoint = self.getConfigCheckpoint()
 
         self.progressbar.setLabelText(' uploading ground truth... ')
         upload_url = 'http://%s:%s/upload'%(ip, port)
@@ -376,7 +374,7 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
                 'input': os.path.basename(img_path),
                 'gts': os.path.basename(gts_path),
                 'propagate': 'Y',
-                'size': self.widget.ui.cmbCheckpoint.currentText,
+                'config': config,
             })
 
         response = requests.post(
@@ -386,7 +384,7 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
                 'input': os.path.basename(img_path),
                 'gts': os.path.basename(gts_path),
                 'propagate': 'Y',
-                'size': self.widget.ui.cmbCheckpoint.currentText,
+                'config': config,
             }
         )
 
@@ -452,11 +450,7 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
         self.boundaries = None
     
     def middle_mask_helper(self, img_path, result_path, ip, port, job_event):
-        if self.widget.ui.pathModel.currentPath == '':
-            checkpoint = 'sam2.1_hiera_%s.pt'%(self.widget.ui.cmbCheckpoint.currentText,)
-        else:
-            model_name = os.path.basename(self.widget.ui.pathModel.currentPath).split('.')[0]
-            checkpoint = os.path.join(model_name, os.path.basename(self.widget.ui.pathModel.currentPath))
+        config, checkpoint = self.getConfigCheckpoint()
         
         if self.widget.ui.pathModel.currentPath != '' and not self.newModelUploaded:
             # TODO: Check if model is valid
@@ -467,6 +461,16 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
                 files = {'file': file}
                 response = requests.post(upload_url, files=files)
                 self.newModelUploaded = True # used for caching
+        
+        if self.widget.ui.pathConfig.currentPath != '' and not self.newConfigUploaded:
+            # TODO: Check if config is valid
+            self.progressbar.setLabelText(' uploading config file... ')
+            upload_url = 'http://%s:%s/upload_config'%(ip, port)
+
+            with open(self.widget.ui.pathConfig.currentPath, 'rb') as file:
+                files = {'file': file}
+                response = requests.post(upload_url, files=files)
+                self.newConfigUploaded = True # used for caching
 
         self.progressbar.setLabelText(' uploading image... ')
         upload_url = 'http://%s:%s/upload'%(ip, port)
@@ -484,7 +488,7 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
                 'input': os.path.basename(img_path),
                 'gts': 'X',
                 'propagate': 'N',
-                'size': self.widget.ui.cmbCheckpoint.currentText,
+                'config': config,
             })
 
         response = requests.post(
@@ -494,7 +498,7 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
                 'input': os.path.basename(img_path),
                 'gts': 'X',
                 'propagate': 'N',
-                'size': self.widget.ui.cmbCheckpoint.currentText,
+                'config': config,
             }
         )
 
@@ -587,6 +591,23 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
             prep_img = self.preprocess_CT(win_level = wl, win_width = ww)
 
         self.updateImage(prep_img)
+    
+    def getConfigCheckpoint(self):
+        if self.widget.ui.pathConfig.currentPath == '':
+            config_suffix = self.widget.ui.cmbCheckpoint.currentText[0]
+            if config_suffix == 'b':
+                config_suffix = config_suffix + '+'
+            config = 'sam2.1_hiera_%s.yaml'%(config_suffix,)
+        else:
+            config = os.path.join('custom_configs', os.path.basename(self.widget.ui.pathConfig.currentPath))
+        
+        if self.widget.ui.pathModel.currentPath == '':
+            checkpoint = 'sam2.1_hiera_%s.pt'%(self.widget.ui.cmbCheckpoint.currentText,)
+        else:
+            model_name = os.path.basename(self.widget.ui.pathModel.currentPath).split('.')[0]
+            checkpoint = os.path.join(model_name, os.path.basename(self.widget.ui.pathModel.currentPath))
+        
+        return config, checkpoint
 
         
 
