@@ -15,6 +15,7 @@ import torch
 import torch.multiprocessing as mp
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from sam2.build_sam import build_sam2_video_predictor_npz, build_sam2
+import yaml
 
 torch.set_float32_matmul_precision('high')
 torch.manual_seed(2024)
@@ -102,7 +103,10 @@ def infer_3d(img_npz_file, gts_file, propagate):
     z_range = npz_data['z_range'] # (z_min, z_max, slice_idx)
     video_height = img_3D.shape[1]
     video_width = img_3D.shape[2]
-    img_resized = resize_grayscale_to_rgb_and_resize(img_3D, 1024)
+    with open(model_cfg, 'r') as yaml_file:
+        yaml_data = yaml.safe_load(yaml_file)
+        image_size = yaml_data['model']['image_size'])
+    img_resized = resize_grayscale_to_rgb_and_resize(img_3D, image_size)
     img_resized = img_resized / 255.0
     img_resized = torch.from_numpy(img_resized).cuda()
     img_mean=(0.485, 0.456, 0.406)

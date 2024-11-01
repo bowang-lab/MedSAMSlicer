@@ -59,11 +59,13 @@ class SAM2ImagePredictor:
         self.mask_threshold = mask_threshold
 
         # Spatial dim for backbone feature maps
-        self._bb_feat_sizes = [
-            (256, 256),
-            (128, 128),
-            (64, 64),
-        ]
+        hires_size = self.model.image_size // 4
+        self._bb_feat_sizes = [[hires_size // (2**k)]*2 for k in range(3)]
+        # self._bb_feat_sizes = [
+        #     (256, 256),
+        #     (128, 128),
+        #     (64, 64),
+        # ]
 
     @classmethod
     def from_pretrained(cls, model_id: str, **kwargs) -> "SAM2ImagePredictor":
