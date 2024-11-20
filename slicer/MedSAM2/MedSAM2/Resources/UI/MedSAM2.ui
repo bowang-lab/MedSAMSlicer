@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>563</width>
-    <height>697</height>
+    <height>861</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
@@ -23,17 +23,17 @@
       <string>Backend Info</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_1">
-      <item row="0" column="2">
-       <widget class="QPlainTextEdit" name="txtPort">
-        <property name="plainText">
-         <string>Port</string>
+      <item row="0" column="0">
+       <widget class="QLineEdit" name="txtIP">
+        <property name="text">
+         <string>IP Address</string>
         </property>
        </widget>
       </item>
-      <item row="0" column="0">
-       <widget class="QPlainTextEdit" name="txtIP">
-        <property name="plainText">
-         <string>IP Address</string>
+      <item row="0" column="1">
+       <widget class="QLineEdit" name="txtPort">
+        <property name="text">
+         <string>Port</string>
         </property>
        </widget>
       </item>
@@ -118,24 +118,37 @@
       <string>ROI</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_3">
-      <item row="0" column="0">
+      <item row="1" column="0">
        <widget class="QPushButton" name="btnStart">
         <property name="text">
          <string>Set As Start Slice</string>
         </property>
        </widget>
       </item>
-      <item row="0" column="1">
+      <item row="2" column="0" colspan="2">
+       <widget class="QPushButton" name="btnROI">
+        <property name="text">
+         <string>Add Bounding Box</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
        <widget class="QPushButton" name="btnEnd">
         <property name="text">
          <string>Set As End Slice</string>
         </property>
        </widget>
       </item>
-      <item row="1" column="0" colspan="2">
-       <widget class="QPushButton" name="btnROI">
+      <item row="0" column="1">
+       <widget class="QComboBox" name="cmbSlicerIdx"/>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_5">
         <property name="text">
-         <string>Add Bounding Box</string>
+         <string>ROI Selection:</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
         </property>
        </widget>
       </item>
@@ -220,6 +233,36 @@
          <stringlist>
           <string>*.yaml</string>
          </stringlist>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="ctkCollapsibleButton" name="CollapsibleButton_5">
+     <property name="text">
+      <string>Improve Segmentation</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_5">
+      <item row="1" column="0" colspan="4">
+       <widget class="QPushButton" name="btnSubtractPoint">
+        <property name="text">
+         <string>Subtraction Guide Point</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0" colspan="4">
+       <widget class="QPushButton" name="btnAddPoint">
+        <property name="text">
+         <string>Addition Guide Point</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1" colspan="2">
+       <widget class="QPushButton" name="btnImprove">
+        <property name="text">
+         <string>Improve Segmention</string>
         </property>
        </widget>
       </item>

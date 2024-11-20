@@ -129,6 +129,9 @@ class MedSAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.cmbPrepOptions.currentTextChanged.connect(lambda new_text: self.setManualPreprocessVis(new_text == 'Manual'))
         self.ui.pbApplyPrep.connect('clicked(bool)', lambda: self.logic.applyPreprocess(self.ui.cmbPrepOptions.currentText, self.ui.sldWinLevel.value, self.ui.sldWinWidth.value))
 
+        self.ui.cmbSlicerIdx.addItems(['Select ROI on the middle slice', 'Select ROI on the first frame'])
+        self.ui.cmbSlicerIdx.currentTextChanged.connect(lambda new_text: self.ui.btnMiddleSlice.setText('Segment Middle Slice' if new_text == 'Select ROI on the middle slice' else  'Segment First Frame'))
+
         self.ui.cmbCheckpoint.addItems(['tiny', 'small', 'base_plus', 'large'])
         self.ui.pathModel.connect('currentPathChanged(const QString&)', lambda: setattr(self.logic, 'newModelUploaded', False))
         self.ui.pathConfig.connect('currentPathChanged(const QString&)', lambda: setattr(self.logic, 'newConfigUploaded', False))
@@ -148,10 +151,13 @@ class MedSAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Buttons
         self.ui.btnStart.connect("clicked(bool)", lambda: self.setROIboundary(lower=True))
         self.ui.btnEnd.connect("clicked(bool)", lambda: self.setROIboundary(lower=False))
-        self.ui.btnROI.connect("clicked(bool)", self.drawBBox)
+        self.ui.btnROI.connect("clicked(bool)", lambda: self.drawBBox(prefix='ROI'))
         self.ui.btnMiddleSlice.connect("clicked(bool)", self.logic.getMiddleMask)
         self.ui.btnRefine.connect("clicked(bool)", self.logic.refineMiddleMask)
         self.ui.btnSegment.connect("clicked(bool)", self.logic.segment)
+        self.ui.btnAddPoint.connect("clicked(bool)", lambda: self.addPoint(prefix='addition'))
+        self.ui.btnSubtractPoint.connect("clicked(bool)", lambda: self.addPoint(prefix='subtraction'))
+        self.ui.btnImprove.connect("clicked(bool)", lambda: self.logic.improveResult())
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
@@ -223,13 +229,27 @@ class MedSAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.logic.boundaries[int(not lower)] = curr_slice
 
         if None not in self.logic.boundaries:
-            slicer.app.layoutManager().sliceWidget("Red").sliceLogic().SetSliceOffset(sum(self.logic.boundaries)/2)
+            slice_idx = sum(self.logic.boundaries)/2 if self.ui.cmbSlicerIdx.currentText == 'Select ROI on the middle slice' else min(self.logic.boundaries)
+            slicer.app.layoutManager().sliceWidget("Red").sliceLogic().SetSliceOffset(slice_idx)
 
         print(self.logic.boundaries)
     
-    def drawBBox(self):
+    def drawBBox(self, prefix=''):
         # Adopted from https://github.com/bingogome/samm/blob/7da10edd7efe44d10369aa13eddead75a7d3a38a/samm/SammBase/SammBaseLib/WidgetSammBase.py
-        planeNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLMarkupsROINode').GetID()
+        planeNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLMarkupsROINode', prefix).GetID()
+        selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
+        selectionNode.SetReferenceActivePlaceNodeID(planeNode)
+        interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+        placeModePersistence = 0
+        interactionNode.SetPlaceModePersistence(placeModePersistence)
+        # mode 1 is Place, can also be accessed via slicer.vtkMRMLInteractionNode().Place
+        interactionNode.SetCurrentInteractionMode(1)
+
+        slicer.mrmlScene.GetNodeByID(planeNode).GetDisplayNode().SetGlyphScale(0.5)
+        slicer.mrmlScene.GetNodeByID(planeNode).GetDisplayNode().SetInteractionHandleScale(1)
+    
+    def addPoint(self, prefix=''):
+        planeNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLMarkupsFiducialNode', prefix).GetID()
         selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
         selectionNode.SetReferenceActivePlaceNodeID(planeNode)
         interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
@@ -266,7 +286,8 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
     allSegmentsNode = None
     newModelUploaded = False
     newConfigUploaded = False
-    segmentation_res_path = '/home/rasakereh/Desktop'
+    cachedBoundaries = None
+    lastSegmentLabel = None
 
     def __init__(self) -> None:
         """Called when the logic class is instantiated. Can be used for initializing member variables."""
@@ -297,6 +318,8 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
         # If volume node is transformed, apply that transform to get volume's RAS coordinates
         transformRasToVolumeRas = vtk.vtkGeneralTransform()
         slicer.vtkMRMLTransformNode.GetTransformBetweenNodes(None, self.volume_node.GetParentTransformNode(), transformRasToVolumeRas)
+        
+        boundaries = [0,0] if self.boundaries is None or None in self.boundaries else self.boundaries
 
         bboxes = []
         for roiNode in roiNodes:
@@ -312,8 +335,8 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
             roiNode.GetBounds(bounds)
             point1 = bounds[::2].copy()
             point2 = bounds[1::2].copy()
-            point1[2] = min(self.boundaries)
-            point2[2] = max(self.boundaries)
+            point1[2] = min(boundaries)
+            point2[2] = max(boundaries)
             
             ijk_points = []
 
@@ -331,13 +354,42 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
                 ijk_points.append(point_Ijk)
 
             zrange = [ijk_points[0][2], ijk_points[1][2]]
-            slice_idx = int((zrange[0] + zrange[1]) / 2) # it is not accurate
+            slice_idx = int((zrange[0] + zrange[1]) / 2) if self.widget.ui.cmbSlicerIdx.currentText == 'Select ROI on the middle slice' else int(min(zrange))
             if ijk_points[0][0] > ijk_points[1][0]:
                 ijk_points[0], ijk_points[1] = ijk_points[1], ijk_points[0]
             bbox = np.hstack([ijk_points[0][:2], ijk_points[1][:2]])
             bboxes.append(bbox)
 
         return slice_idx, bboxes, zrange
+    
+    def get_point_coords(self):
+        self.captureImage()
+        pointNodes = slicer.util.getNodesByClass('vtkMRMLMarkupsFiducialNode')
+
+        # If volume node is transformed, apply that transform to get volume's RAS coordinates
+        transformRasToVolumeRas = vtk.vtkGeneralTransform()
+        slicer.vtkMRMLTransformNode.GetTransformBetweenNodes(None, self.volume_node.GetParentTransformNode(), transformRasToVolumeRas)
+        
+        point_list = {}
+        for pointNode in pointNodes:
+            bounds = np.zeros(6)
+            pointNode.GetBounds(bounds)
+            curr_point = bounds[::2].copy()
+            ijk_points = []
+
+            # Get point coordinate in RAS
+            point_VolumeRas = transformRasToVolumeRas.TransformPoint(curr_point)
+
+            # Get voxel coordinates from physical coordinates
+            volumeRasToIjk = vtk.vtkMatrix4x4()
+            self.volume_node.GetRASToIJKMatrix(volumeRasToIjk)
+            point_Ijk = [0, 0, 0, 1]
+            volumeRasToIjk.MultiplyPoint(np.append(point_VolumeRas,1.0), point_Ijk)
+            point_Ijk = [ int(round(c)) for c in point_Ijk[0:3] ]
+            
+            point_list[pointNode.GetID()] = point_Ijk
+
+        return point_list
     
     def run_on_background(self, target, args, title):
         self.progressbar = slicer.util.createProgressDialog(autoClose=False)
@@ -399,7 +451,7 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
         
         job_event.set()
     
-    def showSegmentation(self, segmentation_mask, set_middle_mask=False):
+    def showSegmentation(self, segmentation_mask, set_middle_mask=False, improve_previous=False):
         if self.allSegmentsNode is None:
             self.allSegmentsNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode")
 
@@ -411,7 +463,8 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
         for idx, label in enumerate(labels, start=1):
             curr_object = np.zeros_like(segmentation_mask)
             curr_object[segmentation_mask == idx] = idx
-            segment_volume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode", 'segment_'+str(idx)+'_'+str(int(time.time())))
+            new_seg_label = 'segment_'+str(idx)+'_'+str(int(time.time()))
+            segment_volume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode", new_seg_label)
             slicer.util.updateVolumeFromArray(segment_volume, curr_object)
 
             slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(segment_volume, current_seg_group)
@@ -426,6 +479,12 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
                 slicer.mrmlScene.RemoveNode(self.middleMaskNode)
             except:
                 pass
+        if improve_previous:
+            print('Removing segment:', self.lastSegmentLabel)
+            self.allSegmentsNode.GetSegmentation().RemoveSegment(self.lastSegmentLabel)
+        
+        self.lastSegmentLabel = new_seg_label
+        print('self.lastSegmentLabel is updated to', self.lastSegmentLabel)
 
 
     def segment(self):
@@ -438,11 +497,14 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
             gts_path = '%s/gts.npz'%(tmpdirname,)
             result_path = '%s/result.npz'%(tmpdirname,)
             np.savez(gts_path, segs=self.getSegmentationArray(self.middleMaskNode))
-            self.run_on_background(self.segment_helper, (img_path, gts_path, result_path, self.widget.ui.txtIP.plainText.strip().strip(), self.widget.ui.txtPort.plainText.strip()), 'Segmenting...')
+            self.run_on_background(self.segment_helper, (img_path, gts_path, result_path, self.widget.ui.txtIP.text.strip(), self.widget.ui.txtPort.text.strip()), 'Segmenting...')
 
             # loading results
             segmentation_mask = np.load(result_path, allow_pickle=True)['segs']
             self.showSegmentation(segmentation_mask)
+
+            # caching box info for possible "segmentation improvement"
+            self.cachedBoundaries = {'bboxes': bboxes, 'zrange': zrange}
 
         roiNodes = slicer.util.getNodesByClass('vtkMRMLMarkupsROINode')
         for roiNode in roiNodes:
@@ -521,7 +583,7 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
             img_path = "%s/img_data.npz"%(tmpdirname,)
             result_path = "%s/result.npz"%(tmpdirname,)
             np.savez(img_path, imgs=self.image_data, boxes=bboxes, z_range=[*zrange, slice_idx])
-            self.run_on_background(self.middle_mask_helper, (img_path, result_path, self.widget.ui.txtIP.plainText.strip(), self.widget.ui.txtPort.plainText.strip()), 'Segmenting...')
+            self.run_on_background(self.middle_mask_helper, (img_path, result_path, self.widget.ui.txtIP.text.strip(), self.widget.ui.txtPort.text.strip()), 'Segmenting...')
             
             # loading results
             segmentation_mask = np.load(result_path, allow_pickle=True)['segs']
@@ -533,7 +595,7 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
     
     def getSegmentationArray(self, segmentationNode):
         segmentIds = segmentationNode.GetSegmentation().GetSegmentIDs()
-        result = np.zeros_like(self.image_data)
+        result = np.zeros(self.image_data.shape[:3])
 
         for idx, segmentId in enumerate(segmentIds, start=1):
             print('getting segmentation array for', idx, segmentId)
@@ -608,6 +670,72 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
             checkpoint = os.path.join(model_name, os.path.basename(self.widget.ui.pathModel.currentPath))
         
         return config, checkpoint
+    
+
+    def improve_helper(self, img_path, result_path, ip, port, job_event):
+        self.progressbar.setLabelText(' uploading improvement details... ')
+        upload_url = 'http://%s:%s/upload'%(ip, port)
+
+        with open(img_path, 'rb') as file:
+            files = {'file': file}
+            response = requests.post(upload_url, files=files)
+
+        self.progressbar.setLabelText(' improving... ')
+        improve_url = 'http://%s:%s/improve'%(ip, port)
+
+        print('data sent is: ', {
+                'input': os.path.basename(img_path),
+            })
+
+        response = requests.post(
+            improve_url,
+            data={
+                'input': os.path.basename(img_path),
+            }
+        )
+
+
+        self.progressbar.setLabelText(' downloading results... ')
+        download_file_url = 'http://%s:%s/download_file'%(ip, port)
+
+        response = requests.get(download_file_url, data={'output': 'data/video/segs_tiny/%s'%os.path.basename(img_path)})
+
+        with open(result_path, 'wb') as f:
+            f.write(response.content)
+        
+        job_event.set()
+    
+
+    def improveResult(self):
+        # TODO: Make sure a full inference is already performed [you can use self.cachedBoundaries]
+        # TODO: Make sure that new points fall within the latest inference bounds
+
+        point_list = self.get_point_coords()
+        points_partition = {'addition': [], 'subtraction': []}
+        for point_name in point_list:
+            point_type = 'addition' if 'addition' in slicer.util.getNode(point_name).GetName() else 'subtraction'
+            points_partition[point_type].append(point_list[point_name])
+        print(points_partition)
+
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            img_path = "%s/img_data.npz"%(tmpdirname,)
+            result_path = "%s/result.npz"%(tmpdirname,)
+            np.savez(img_path,
+                bboxes=self.cachedBoundaries['bboxes'],
+                zrange=self.cachedBoundaries['zrange'],
+                points_addition=points_partition['addition'],
+                points_subtraction=points_partition['subtraction'],
+                img_size=self.image_data.shape[:3]
+            )
+            self.run_on_background(self.improve_helper, (img_path, result_path, self.widget.ui.txtIP.text.strip(), self.widget.ui.txtPort.text.strip()), 'Improving Segmentation...')
+            
+            # loading results
+            segmentation_mask = np.load(result_path, allow_pickle=True)['segs']
+            self.showSegmentation(segmentation_mask, improve_previous=True)
+        
+        pointNodes = slicer.util.getNodesByClass('vtkMRMLMarkupsFiducialNode')
+        for pointNode in pointNodes:
+            slicer.mrmlScene.RemoveNode(pointNode)
 
         
 

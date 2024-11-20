@@ -3,44 +3,64 @@ import shutil
 from pathlib import Path
 import subprocess
 import os
+from infer_SAM21_slicer import perform_inference, improve_inference
 
 app = Flask(__name__)
 
+predictor_state = {}
 
 @app.route('/run_script', methods=['POST'])
 def run_script():
     input_name = request.form.get('input')
     gts_name = request.form.get('gts')
-    propagate = request.form.get('propagate')
+    propagate = request.form.get('propagate') in ['y', 'Y']
     checkpoint = 'checkpoints/2.1/%s'%(request.form.get('checkpoint'),)
     cfg = request.form.get('config')
 
-    script_parameters = [
-        'python',
-        'infer_SAM21_slicer.py',
-        '--cfg', 
-        cfg,
-        '--img_path',
-        input_name,
-        '--gts_path',
-        gts_name,
-        '--propagate',
-        propagate,
-        '--checkpoint',
-        checkpoint,
-        '--pred_save_dir',
-        'data/video/segs_tiny',
-    ]
-    process = subprocess.Popen(script_parameters, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = process.communicate()
-    print('=================================\n', stderr, '\n=================================')
+    predictor, inference_state = perform_inference(checkpoint, cfg, input_name, gts_name, propagate, pred_save_dir='data/video/segs_tiny')
+    predictor_state['predictor'] = predictor
+    predictor_state['inference_state'] = inference_state
+
+    return 'Success'
+
+    # script_parameters = [
+    #     'python',
+    #     'infer_SAM21_slicer.py',
+    #     '--cfg', 
+    #     cfg,
+    #     '--img_path',
+    #     input_name,
+    #     '--gts_path',
+    #     gts_name,
+    #     '--propagate',
+    #     propagate,
+    #     '--checkpoint',
+    #     checkpoint,
+    #     '--pred_save_dir',
+    #     'data/video/segs_tiny',
+    # ]
+
+    # process = subprocess.Popen(script_parameters, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # stdout, stderr = process.communicate()
+    # print('=================================\n', stderr, '\n=================================')
 
     #TODO: remove custom model?
     
-    if process.returncode == 0:
-        return f'Success: {stdout.decode("utf-8")}'
-    else:
-        return f'Error: {stderr.decode("utf-8")}'
+    # if process.returncode == 0:
+    #     return f'Success: {stdout.decode("utf-8")}'
+    # else:
+    #     return f'Error: {stderr.decode("utf-8")}'
+
+@app.route('/improve', methods=['POST'])
+def improve():
+    input_name = request.form.get('input')
+
+    predictor, inference_state = improve_inference(input_name, pred_save_dir='data/video/segs_tiny', predictor_state=predictor_state)
+    predictor_state['predictor'] = predictor
+    predictor_state['inference_state'] = inference_state
+
+    return 'Success'
+
 
 @app.route('/download_file', methods=['GET'])
 def download_file():
