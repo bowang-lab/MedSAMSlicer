@@ -110,12 +110,13 @@ def infer_3d(predictor, img_npz_file, gts_file, propagate, model_cfg, pred_save_
         z_mid = int(img.shape[0]/2)
         z_mids.append(z_mid_orig)
         mask_prompt = gt[z_mid_orig]
+        ann_frame_idx = z_mid_orig - (z_min if z_min is not None else 0)
 
         print('analyzed image size', img.shape, 'mid idx', z_mid)
         with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
             # input img is shape depth_to_consider, 3, 512, 512
             inference_state = predictor.init_state(img, video_height, video_width)
-            frame_idx, object_ids, masks = predictor.add_new_mask(inference_state, frame_idx=z_mid_orig, obj_id=1, mask=mask_prompt)
+            frame_idx, object_ids, masks = predictor.add_new_mask(inference_state, frame_idx=ann_frame_idx, obj_id=1, mask=mask_prompt)
             segs_3D[z_mid_orig, ((masks[0] > 0.0).cpu().numpy())[0]] = idx
             # run propagation throughout the video and collect the results in a dict
             #video_segments = {}  # video_segments contains the per-frame segmentation results
@@ -123,7 +124,7 @@ def infer_3d(predictor, img_npz_file, gts_file, propagate, model_cfg, pred_save_
                 print(out_frame_idx)
                 segs_3D[(z_min + out_frame_idx), (out_mask_logits[0] > 0.0).cpu().numpy()[0]] = idx
             predictor.reset_state(inference_state)
-            frame_idx, object_ids, masks = predictor.add_new_mask(inference_state, frame_idx=z_mid_orig, obj_id=1, mask=mask_prompt)
+            frame_idx, object_ids, masks = predictor.add_new_mask(inference_state, frame_idx=ann_frame_idx, obj_id=1, mask=mask_prompt)
             for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, reverse=True):
                 print(out_frame_idx)
                 segs_3D[(z_min + out_frame_idx), (out_mask_logits[0] > 0.0).cpu().numpy()[0]] = idx
