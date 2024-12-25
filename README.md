@@ -29,7 +29,7 @@ Please install SAM 2.1 on a GPU machine with CUDA>=12.4 using:
 
 To ensure the successful installation of the backend, you can run the following script:
 ```bash
-python infer_SAM21_slicer.py --cfg sam2.1_hiera_t.yaml --img_path img_data.npz --gts_path X --propagate N --checkpoint checkpoints/2.1/sam2.1_hiera_tiny --pred_save_dir data/video/segs_tiny
+python infer_SAM21_slicer.py
 ```
 
 ### Plugin Setup

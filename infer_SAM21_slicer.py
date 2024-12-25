@@ -217,5 +217,5 @@ def improve_inference(img_path, pred_save_dir, predictor_state):
 
 
 if __name__ == '__main__':
-    infer_3d(img_path, gts_path, propagate)
-
+    perform_inference('checkpoints/2.1/sam2.1_hiera_tiny.pt', 'sam2.1_hiera_t.yaml', 'img_data.npz', 'X', False, 'data/video/segs_tiny')
+    print('Server is installed!')
