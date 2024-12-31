@@ -359,6 +359,9 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
                 ijk_points[0], ijk_points[1] = ijk_points[1], ijk_points[0]
             bbox = np.hstack([ijk_points[0][:2], ijk_points[1][:2]])
             bboxes.append(bbox)
+        
+        zrange[0] = max(0, zrange[0])
+        zrange[1] = min(zrange[1], self.image_data.shape[0]-1)
 
         return slice_idx, bboxes, zrange
     
