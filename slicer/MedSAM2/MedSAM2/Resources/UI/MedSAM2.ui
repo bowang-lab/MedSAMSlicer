@@ -174,7 +174,7 @@
       <item row="0" column="0" colspan="2">
        <widget class="QLabel" name="label_2">
         <property name="text">
-         <string>Model Size:</string>
+         <string>Model:</string>
         </property>
         <property name="alignment">
          <set>Qt::AlignCenter</set>

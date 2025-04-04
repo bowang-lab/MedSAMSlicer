@@ -1,4 +1,4 @@
-# Slicer-SAM 2: 3D Slicer Plugin for Segment Anything in Images and Videos
+# Slicer-MedSAM 2: 3D Slicer Plugin for Medical Segment Anything for Images and Videos
 
 [[`Paper`](https://ai.meta.com/research/publications/sam-2-segment-anything-in-images-and-videos/)] [[`BibTeX`](#citing-sam-2)]
 
@@ -12,10 +12,10 @@
 [Installation Guide Video](https://youtu.be/i4h6qCuFbqE)
 
 
-This code base relies extensively on SAM2.1 original code base. As 3D Slicer python version at the time of development was 3.9 and SAM2.1 requires it to be at least 3.10, the segmentation core and plugin interface should be set up separately.
+This code base relies on SAM2.1 base configuration. As 3D Slicer python version at the time of development was 3.9 and SAM2.1 requires it to be at least 3.10, the segmentation core and plugin interface should be set up separately.
 
 ### Segmentation Backend Setup
-Please install SAM 2.1 on a GPU machine with CUDA>=12.4 using:
+Please install MedSAM 2 on a GPU machine with CUDA>=12.4 using:
 
 - Download repository: `git clone https://github.com/bowang-lab/MedSAMSlicer.git`
 `cd MedSAMSlicer; git checkout MedSAM2`
@@ -24,12 +24,12 @@ Please install SAM 2.1 on a GPU machine with CUDA>=12.4 using:
 - Install [PyTorch](https://pytorch.org/get-started/locally/) 2.4: `conda install pytorch torchvision pytorch-cuda=12.4 -c pytorch -c nvidia`
 - `pip install -e .`
 - `pip install -r requirements.txt`
-- Download checkpoints (various trained SAM2.1 models) and config files: `./extra_files.sh`. Alternatively, if you are using powershell: `powershell -ExecutionPolicy Bypass -File .\extra_files.ps1`
+- Download checkpoints (various trained MedSAM2 models): `python download_models.py`
 
 
 To ensure the successful installation of the backend, you can run the following script:
 ```bash
-python infer_SAM21_slicer.py
+python infer_MedSAM2_slicer.py
 ```
 
 ### Plugin Setup
@@ -54,7 +54,7 @@ This runs the server on the public interface of your device on port 8080.
 
 ### Basic Slicer Plugin Usage
 
-1. In 3D Slicer, from the  `Welcome to Slicer` drop-down menu, under the `Segmentation` sub-menu, select `SAM2`.
+1. In 3D Slicer, from the  `Welcome to Slicer` drop-down menu, under the `Segmentation` sub-menu, select `MedSAM2`.
 2. Set IP to the machine running the server. For local machines use 127.0.0.1. Do the same for port.
 3. After loading your image, choose the proper preprocessing method from the `Preprocessing` section.
 4. In the Red pannel, slide to the beginning of the component you want to segment. From `ROI` section select `Set As Start Slice`.

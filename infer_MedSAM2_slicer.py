@@ -217,5 +217,5 @@ def improve_inference(img_path, pred_save_dir, predictor_state):
 
 
 if __name__ == '__main__':
-    perform_inference('checkpoints/2.1/sam2.1_hiera_tiny.pt', 'sam2.1_hiera_t.yaml', 'img_data.npz', 'X', False, 'data/video/segs_tiny')
+    perform_inference('checkpoints/MedSAM2_latest.pt', 'MedSAM2_tiny512.yaml', 'img_data.npz', 'X', False, 'data/video/segs_tiny')
     print('Server is installed!')

@@ -3,7 +3,7 @@ import shutil
 from pathlib import Path
 import subprocess
 import os
-from infer_SAM21_slicer import perform_inference, improve_inference
+from infer_MedSAM2_slicer import perform_inference, improve_inference
 
 app = Flask(__name__)
 
@@ -14,7 +14,7 @@ def run_script():
     input_name = request.form.get('input')
     gts_name = request.form.get('gts')
     propagate = request.form.get('propagate') in ['y', 'Y']
-    checkpoint = 'checkpoints/2.1/%s'%(request.form.get('checkpoint'),)
+    checkpoint = 'checkpoints/%s'%(request.form.get('checkpoint'),)
     cfg = request.form.get('config')
 
     predictor, inference_state = perform_inference(checkpoint, cfg, input_name, gts_name, propagate, pred_save_dir='data/video/segs_tiny')
@@ -79,7 +79,7 @@ def upload_file():
 def upload_model():    
     file = request.files['file']
     model_name = os.path.basename(file.filename).split('.')[0]
-    checkpoint_dir = "./checkpoints/2.1/%s"%model_name
+    checkpoint_dir = "./checkpoints/%s"%model_name
 
     Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
 

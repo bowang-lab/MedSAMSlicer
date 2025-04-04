@@ -132,7 +132,14 @@ class MedSAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.cmbSlicerIdx.addItems(['Select ROI on the middle slice', 'Select ROI on the first frame'])
         self.ui.cmbSlicerIdx.currentTextChanged.connect(lambda new_text: self.ui.btnMiddleSlice.setText('Segment Middle Slice' if new_text == 'Select ROI on the middle slice' else  'Segment First Frame'))
 
-        self.ui.cmbCheckpoint.addItems(['tiny', 'small', 'base_plus', 'large'])
+        self.checkpoint_list = {
+            'Latest': 'MedSAM2_latest.pt',
+            'Lesions CT scan': 'MedSAM2_CTLesion.pt',
+            'Liver lesions MRI': 'MedSAM2_MRI_LiverLesion.pt',
+            'Heart ultra sound': 'MedSAM2_US_Heart.pt',
+            'Base model': 'MedSAM2_2411.pt'
+        }
+        self.ui.cmbCheckpoint.addItems(list(self.checkpoint_list.keys()))
         self.ui.pathModel.connect('currentPathChanged(const QString&)', lambda: setattr(self.logic, 'newModelUploaded', False))
         self.ui.pathConfig.connect('currentPathChanged(const QString&)', lambda: setattr(self.logic, 'newConfigUploaded', False))
         
@@ -147,6 +154,9 @@ class MedSAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.btnMiddleSlice.setIcon(QIcon(os.path.join(iconsPath, 'target.png')))
         self.ui.btnRefine.setIcon(QIcon(os.path.join(iconsPath, 'performance.png')))
         self.ui.btnSegment.setIcon(QIcon(os.path.join(iconsPath, 'body-scan.png')))
+        self.ui.btnAddPoint.setIcon(QIcon(os.path.join(iconsPath, 'add-selection.png')))
+        self.ui.btnSubtractPoint.setIcon(QIcon(os.path.join(iconsPath, 'sub-selection.png')))
+        self.ui.btnImprove.setIcon(QIcon(os.path.join(iconsPath, 'continuous-improvement.png')))
 
         # Buttons
         self.ui.btnStart.connect("clicked(bool)", lambda: self.setROIboundary(lower=True))
@@ -413,7 +423,7 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
     def segment_helper(self, img_path, gts_path, result_path, ip, port, job_event):
         config, checkpoint = self.getConfigCheckpoint()
 
-        self.progressbar.setLabelText(' uploading ground truth... ')
+        self.progressbar.setLabelText(' uploading refined middle slice... ')
         upload_url = 'http://%s:%s/upload'%(ip, port)
 
         with open(gts_path, 'rb') as file:
@@ -659,15 +669,12 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
     
     def getConfigCheckpoint(self):
         if self.widget.ui.pathConfig.currentPath == '':
-            config_suffix = self.widget.ui.cmbCheckpoint.currentText[0]
-            if config_suffix == 'b':
-                config_suffix = config_suffix + '+'
-            config = 'sam2.1_hiera_%s.yaml'%(config_suffix,)
+            config = 'MedSAM2_tiny512.yaml'
         else:
             config = 'custom_' + os.path.basename(self.widget.ui.pathConfig.currentPath)
         
         if self.widget.ui.pathModel.currentPath == '':
-            checkpoint = 'sam2.1_hiera_%s.pt'%(self.widget.ui.cmbCheckpoint.currentText,)
+            checkpoint = self.widget.checkpoint_list[self.widget.ui.cmbCheckpoint.currentText]
         else:
             model_name = os.path.basename(self.widget.ui.pathModel.currentPath).split('.')[0]
             checkpoint = os.path.join(model_name, os.path.basename(self.widget.ui.pathModel.currentPath))
