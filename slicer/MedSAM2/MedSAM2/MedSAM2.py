@@ -154,6 +154,7 @@ class MedSAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.btnMiddleSlice.setIcon(QIcon(os.path.join(iconsPath, 'target.png')))
         self.ui.btnRefine.setIcon(QIcon(os.path.join(iconsPath, 'performance.png')))
         self.ui.btnSegment.setIcon(QIcon(os.path.join(iconsPath, 'body-scan.png')))
+        self.ui.btnRefine3D.setIcon(QIcon(os.path.join(iconsPath, 'performance.png')))
         self.ui.btnAddPoint.setIcon(QIcon(os.path.join(iconsPath, 'add-selection.png')))
         self.ui.btnSubtractPoint.setIcon(QIcon(os.path.join(iconsPath, 'sub-selection.png')))
         self.ui.btnImprove.setIcon(QIcon(os.path.join(iconsPath, 'continuous-improvement.png')))
@@ -165,9 +166,15 @@ class MedSAM2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.btnMiddleSlice.connect("clicked(bool)", self.logic.getMiddleMask)
         self.ui.btnRefine.connect("clicked(bool)", self.logic.refineMiddleMask)
         self.ui.btnSegment.connect("clicked(bool)", self.logic.segment)
+        self.ui.btnRefine3D.connect("clicked(bool)", self.logic.refineMiddleMask)
         self.ui.btnAddPoint.connect("clicked(bool)", lambda: self.addPoint(prefix='addition'))
         self.ui.btnSubtractPoint.connect("clicked(bool)", lambda: self.addPoint(prefix='subtraction'))
         self.ui.btnImprove.connect("clicked(bool)", lambda: self.logic.improveResult())
+
+        self.ui.CollapsibleButton_5.setVisible(False)
+        self.ui.btnAddPoint.setVisible(False)
+        self.ui.btnSubtractPoint.setVisible(False)
+        self.ui.btnImprove.setVisible(False)
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
@@ -518,6 +525,8 @@ class MedSAM2Logic(ScriptedLoadableModuleLogic):
 
             # caching box info for possible "segmentation improvement"
             self.cachedBoundaries = {'bboxes': bboxes, 'zrange': zrange}
+
+            self.widget.ui.CollapsibleButton_5.setVisible(True)
 
         roiNodes = slicer.util.getNodesByClass('vtkMRMLMarkupsROINode')
         for roiNode in roiNodes:

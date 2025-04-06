@@ -2,9 +2,9 @@
 
 [[`Paper`](https://ai.meta.com/research/publications/sam-2-segment-anything-in-images-and-videos/)] [[`BibTeX`](#citing-sam-2)]
 
-![Slicer-SAM 2 Screenshot](assets/slicer_plugin.png?raw=true)
+![Slicer-MedSAM 2 Screenshot](assets/slicer_plugin.png?raw=true)
 
-**Segment Anything Model 2.1 (SAM 2.1)** is a foundation model towards solving promptable visual segmentation in images and videos. We have adopted this valuable model developed by [Meta AI](https://ai.meta.com/research/) to detect lesions and various components in 3D medical images.
+**MedSAM2: Segment Anything in 3D Medical Images and Videos** is a foundation model towards solving promptable visual segmentation in medical images and videos. We have adopted this valuable model developed by [Meta AI](https://ai.meta.com/research/) to detect lesions and various components in 3D medical images and videos.
 
 
 ## Installation
@@ -17,8 +17,12 @@ This code base relies on SAM2.1 base configuration. As 3D Slicer python version 
 ### Segmentation Backend Setup
 Please install MedSAM 2 on a GPU machine with CUDA>=12.4 using:
 
-- Download repository: `git clone https://github.com/bowang-lab/MedSAMSlicer.git`
-`cd MedSAMSlicer; git checkout MedSAM2`
+- Download repository: 
+```bash
+git clone https://github.com/bowang-lab/MedSAMSlicer.git
+cd MedSAMSlicer
+git checkout MedSAM2
+```
 - Create virtual environment: `conda create -n medsam2 python=3.12 -y`
 - `conda activate medsam2`
 - Install [PyTorch](https://pytorch.org/get-started/locally/) 2.4: `conda install pytorch torchvision pytorch-cuda=12.4 -c pytorch -c nvidia`

@@ -245,24 +245,31 @@
       <string>Improve Segmentation</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_5">
-      <item row="1" column="0" colspan="4">
+      <item row="3" column="1" colspan="2">
+       <widget class="QPushButton" name="btnImprove">
+        <property name="text">
+         <string>Improve Segmention</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0" colspan="4">
        <widget class="QPushButton" name="btnSubtractPoint">
         <property name="text">
          <string>Subtraction Guide Point</string>
         </property>
        </widget>
       </item>
-      <item row="0" column="0" colspan="4">
+      <item row="1" column="0" colspan="4">
        <widget class="QPushButton" name="btnAddPoint">
         <property name="text">
          <string>Addition Guide Point</string>
         </property>
        </widget>
       </item>
-      <item row="2" column="1" colspan="2">
-       <widget class="QPushButton" name="btnImprove">
+      <item row="0" column="0" colspan="4">
+       <widget class="QPushButton" name="btnRefine3D">
         <property name="text">
-         <string>Improve Segmention</string>
+         <string>Refine 3D Segmentation</string>
         </property>
        </widget>
       </item>
