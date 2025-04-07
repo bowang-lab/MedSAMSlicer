@@ -1,6 +1,6 @@
 # Slicer-MedSAM 2: 3D Slicer Plugin for Medical Segment Anything for Images and Videos
 
-[[`Paper`](https://ai.meta.com/research/publications/sam-2-segment-anything-in-images-and-videos/)] [[`BibTeX`](#citing-sam-2)]
+[[`Paper`](https://arxiv.org/abs/2504.03600)] [[`BibTeX`](#citing-sam-2)]
 
 ![Slicer-MedSAM 2 Screenshot](assets/slicer_plugin.png?raw=true)
 
