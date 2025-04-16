@@ -1,0 +1,19 @@
+# virtual env
+.venv/*
+
+# other
+.DS_Store
+
+# build
+SAM_2.egg-info/*
+sam2/*
+*.pyc
+
+sam2/__pycache__/
+sam2/utils/__pycache__/
+sam2/modeling/backbones/__pycache__/
+sam2/modeling/sam/__pycache__/
+
+
+# checkpoint
+checkpoints/
