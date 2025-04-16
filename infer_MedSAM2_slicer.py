@@ -19,8 +19,22 @@ import yaml
 
 torch.set_float32_matmul_precision('high')
 torch.manual_seed(2024)
-torch.cuda.manual_seed(2024)
 np.random.seed(2024)
+
+# Check available device
+def get_device():
+    if torch.cuda.is_available():
+        device = "cuda"
+        torch.cuda.manual_seed(2024)
+    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+    print(f"Using device: {device}")
+    return device
+
+# Get the optimal device
+DEVICE = get_device()
 
 def resize_rgb(array, image_size):
     d, h, w = array.shape[:3]
@@ -57,7 +71,7 @@ def infer_3d(predictor, img_npz_file, gts_file, propagate, model_cfg, pred_save_
     if np.max(img_3D) >= 256:
         img_3D = (img_3D - np.min(img_3D)) / (np.max(img_3D) - np.min(img_3D)) * 255
         img_3D = img_3D.astype(np.int16)
-    # assert np.max(img_3D) < 256, f'input data should be in range [0, 255], but got {np.unique(img_3D)}'
+# assert np.max(img_3D) < 256, f'input data should be in range [0, 255], but got {np.unique(img_3D)}'
     img_3D = grayscale2rgb(img_3D)
     D, H, W = img_3D.shape[:3]
     segs_3D = np.zeros(img_3D.shape[:3], dtype=np.uint8)
@@ -70,11 +84,14 @@ def infer_3d(predictor, img_npz_file, gts_file, propagate, model_cfg, pred_save_
         image_size = yaml_data['model']['image_size']
     img_resized = resize_rgb(img_3D, image_size)
     img_resized = img_resized / 255.0
-    img_resized = torch.from_numpy(img_resized).cuda()
+    if DEVICE == "mps":
+        img_resized = torch.from_numpy(img_resized).to(torch.float32).to(DEVICE)
+    else:
+        img_resized = torch.from_numpy(img_resized).to(DEVICE)
     img_mean=(0.485, 0.456, 0.406)
     img_std=(0.229, 0.224, 0.225)
-    img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None].cuda()
-    img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None].cuda()
+    img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None].to(DEVICE)
+    img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None].to(DEVICE)
     img_resized -= img_mean
     img_resized /= img_std
     z_mids = []
@@ -113,13 +130,16 @@ def infer_3d(predictor, img_npz_file, gts_file, propagate, model_cfg, pred_save_
         ann_frame_idx = z_mid_orig - (z_min if z_min is not None else 0)
 
         print('analyzed image size', img.shape, 'mid idx', z_mid)
-        with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+        
+        context_manager = torch.autocast(DEVICE, dtype=torch.bfloat16) if DEVICE in ["cuda", "mps"] else torch.inference_mode()
+        
+        with torch.inference_mode(), context_manager:
             # input img is shape depth_to_consider, 3, 512, 512
             inference_state = predictor.init_state(img, video_height, video_width)
             frame_idx, object_ids, masks = predictor.add_new_mask(inference_state, frame_idx=ann_frame_idx, obj_id=1, mask=mask_prompt)
             segs_3D[z_mid_orig, ((masks[0] > 0.0).cpu().numpy())[0]] = idx
             # run propagation throughout the video and collect the results in a dict
-            #video_segments = {}  # video_segments contains the per-frame segmentation results
+#video_segments = {}  # video_segments contains the per-frame segmentation results
             for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state):
                 print(out_frame_idx)
                 segs_3D[(z_min + out_frame_idx), (out_mask_logits[0] > 0.0).cpu().numpy()[0]] = idx
@@ -158,8 +178,10 @@ def improve_3d(predictor, inference_state, img_npz_file, pred_save_dir):
     ann_frame_idx = z_mid_orig - z_min
 
     points = points[:,:-1].astype(np.float32) # dropping 3rd dimension
-
-    with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+    
+    context_manager = torch.autocast(DEVICE, dtype=torch.bfloat16) if DEVICE in ["cuda", "mps"] else torch.inference_mode()
+    
+    with torch.inference_mode(), context_manager:
         _, _, masks = predictor.add_new_points_or_box(
             inference_state=inference_state,
             frame_idx=ann_frame_idx,
@@ -170,7 +192,6 @@ def improve_3d(predictor, inference_state, img_npz_file, pred_save_dir):
         )
         segs_3D[z_mid_orig, ((masks[0] > 0.0).cpu().numpy())[0]] = 1
         # run propagation throughout the video and collect the results in a dict
-        #video_segments = {}  # video_segments contains the per-frame segmentation results
         for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state):
             print(out_frame_idx)
             segs_3D[(z_min + out_frame_idx), (out_mask_logits[0] > 0.0).cpu().numpy()[0]] = 1
@@ -195,8 +216,11 @@ def improve_3d(predictor, inference_state, img_npz_file, pred_save_dir):
 
 
 def perform_inference(checkpoint, cfg, img_path, gts_path, propagate, pred_save_dir):
-    # make propagate boolean
-    predictor = build_sam2_video_predictor_npz(cfg, checkpoint) if propagate else SAM2ImagePredictor(build_sam2(cfg, checkpoint, device="cuda"))
+    # Create predictor based on available device
+    if propagate:
+        predictor = build_sam2_video_predictor_npz(cfg, checkpoint)
+    else:
+        predictor = SAM2ImagePredictor(build_sam2(cfg, checkpoint, device=DEVICE))
 
     os.makedirs(pred_save_dir, exist_ok=True)
 
