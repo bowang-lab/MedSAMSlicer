@@ -10,6 +10,12 @@ from skimage import transform, io
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+
+# Add parent directory to path to import tiny_vit_sam
+_parent_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _parent_dir not in sys.path:
+    sys.path.insert(0, _parent_dir)
+
 from tiny_vit_sam import TinyViT
 from PIL import Image
 from segment_anything.modeling import MaskDecoder, PromptEncoder, TwoWayTransformer
