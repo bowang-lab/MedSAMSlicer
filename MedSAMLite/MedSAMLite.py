@@ -498,7 +498,8 @@ class MedSAMLiteWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         Called each time the user opens this module.
         """
         # Make sure parameter node exists and observed
-        self.initializeParameterNode()
+        if hasattr(self, 'ui'):
+            self.initializeParameterNode()
 
     def exit(self) -> None:
         """
